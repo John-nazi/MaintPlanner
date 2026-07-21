@@ -47,7 +47,7 @@ SEMANAS_POR_PAGINA = 6
 # aparecerán en el menú de Telegram.
 
 CARPETAS_SEMANALES = {
-    52: "PEGA_AQUI_LINK_SEMANA_52",
+    52: "https://grupometalsa.sharepoint.com/:f:/s/PLANEACINPINTURA-SECUENCIADO/IgAsHoW1tDVnQouYG6qqTBRGAdBdKG-TS2LfHDQmwsMjSos?e=nxhdhd",
     51: "PEGA_AQUI_LINK_SEMANA_51",
     50: "PEGA_AQUI_LINK_SEMANA_50",
     49: "PEGA_AQUI_LINK_SEMANA_49",
