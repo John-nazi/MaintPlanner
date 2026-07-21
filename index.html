@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Editor PDF Telegram</title>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: Arial, sans-serif;
+      background: var(--tg-theme-bg-color, #ffffff);
+      color: var(--tg-theme-text-color, #000000);
+    }
+
+    .contenedor {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    .estado {
+      padding: 16px;
+      border-radius: 10px;
+      background: var(--tg-theme-secondary-bg-color, #f2f2f2);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="contenedor">
+    <h1>Editor PDF</h1>
+
+    <div class="estado">
+      Mini App abierta correctamente dentro de Telegram.
+    </div>
+  </div>
+
+  <script>
+    const telegram = window.Telegram.WebApp;
+
+    telegram.ready();
+    telegram.expand();
+  </script>
+</body>
+</html>
