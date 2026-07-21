@@ -30,133 +30,263 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 PUERTO = int(os.getenv("PORT", "10000"))
 URL_RENDER = os.getenv("RENDER_EXTERNAL_URL")
 
-# Cantidad de semanas mostradas en cada página
+# Cantidad de semanas visibles por página
 SEMANAS_POR_PAGINA = 6
 
 
 # ============================================================
-# ENLACES DE LAS CARPETAS DE SHAREPOINT
+# ÁREAS Y CARPETAS SEMANALES
 # ============================================================
-# Reemplaza el texto PEGA_AQUI_LINK_SEMANA_XX por el enlace
-# correspondiente de SharePoint.
+# Reemplaza PEGA_AQUI_LINK... por el vínculo real de SharePoint.
 #
-# Ejemplo:
-# 30: "https://grupometalsa.sharepoint.com/...",
-#
-# Las semanas que todavía no tengan un enlace real no
-# aparecerán en el menú de Telegram.
+# Las semanas que todavía tengan el texto de ejemplo
+# no aparecerán en Telegram.
 
-CARPETAS_SEMANALES = {
-    52: "https://grupometalsa.sharepoint.com/:f:/s/PLANEACINPINTURA-SECUENCIADO/IgAsHoW1tDVnQouYG6qqTBRGAdBdKG-TS2LfHDQmwsMjSos?e=nxhdhd",
-    51: "PEGA_AQUI_LINK_SEMANA_51",
-    50: "PEGA_AQUI_LINK_SEMANA_50",
-    49: "PEGA_AQUI_LINK_SEMANA_49",
-    48: "PEGA_AQUI_LINK_SEMANA_48",
-    47: "PEGA_AQUI_LINK_SEMANA_47",
-    46: "PEGA_AQUI_LINK_SEMANA_46",
-    45: "PEGA_AQUI_LINK_SEMANA_45",
-    44: "PEGA_AQUI_LINK_SEMANA_44",
-    43: "PEGA_AQUI_LINK_SEMANA_43",
-    42: "PEGA_AQUI_LINK_SEMANA_42",
-    41: "PEGA_AQUI_LINK_SEMANA_41",
-    40: "PEGA_AQUI_LINK_SEMANA_40",
-    39: "PEGA_AQUI_LINK_SEMANA_39",
-    38: "PEGA_AQUI_LINK_SEMANA_38",
-    37: "PEGA_AQUI_LINK_SEMANA_37",
-    36: "PEGA_AQUI_LINK_SEMANA_36",
-    35: "PEGA_AQUI_LINK_SEMANA_35",
-    34: "PEGA_AQUI_LINK_SEMANA_34",
-    33: "PEGA_AQUI_LINK_SEMANA_33",
-    32: "PEGA_AQUI_LINK_SEMANA_32",
-    31: "PEGA_AQUI_LINK_SEMANA_31",
-    30: "PEGA_AQUI_LINK_SEMANA_30",
-    29: "PEGA_AQUI_LINK_SEMANA_29",
-    28: "PEGA_AQUI_LINK_SEMANA_28",
-    27: "PEGA_AQUI_LINK_SEMANA_27",
-    26: "PEGA_AQUI_LINK_SEMANA_26",
-    25: "PEGA_AQUI_LINK_SEMANA_25",
-    24: "PEGA_AQUI_LINK_SEMANA_24",
-    23: "PEGA_AQUI_LINK_SEMANA_23",
-    22: "PEGA_AQUI_LINK_SEMANA_22",
-    21: "PEGA_AQUI_LINK_SEMANA_21",
-    20: "PEGA_AQUI_LINK_SEMANA_20",
-    19: "PEGA_AQUI_LINK_SEMANA_19",
-    18: "PEGA_AQUI_LINK_SEMANA_18",
-    17: "PEGA_AQUI_LINK_SEMANA_17",
-    16: "PEGA_AQUI_LINK_SEMANA_16",
-    15: "PEGA_AQUI_LINK_SEMANA_15",
-    14: "PEGA_AQUI_LINK_SEMANA_14",
-    13: "PEGA_AQUI_LINK_SEMANA_13",
-    12: "PEGA_AQUI_LINK_SEMANA_12",
-    11: "PEGA_AQUI_LINK_SEMANA_11",
-    10: "PEGA_AQUI_LINK_SEMANA_10",
-    9: "PEGA_AQUI_LINK_SEMANA_09",
-    8: "PEGA_AQUI_LINK_SEMANA_08",
-    7: "PEGA_AQUI_LINK_SEMANA_07",
-    6: "PEGA_AQUI_LINK_SEMANA_06",
-    5: "PEGA_AQUI_LINK_SEMANA_05",
-    4: "PEGA_AQUI_LINK_SEMANA_04",
-    3: "PEGA_AQUI_LINK_SEMANA_03",
-    2: "PEGA_AQUI_LINK_SEMANA_02",
-    1: "PEGA_AQUI_LINK_SEMANA_01",
+AREAS = {
+    "pintura": {
+        "nombre": "Pintura y Secuenciado",
+        "icono": "🔴",
+        "carpeta_principal": (
+            "https://grupometalsa.sharepoint.com/:f:/s/"
+            "MMSMantenimientoEquiposVC/"
+            "IgDFBQ_mM4vTSY0XMhO1O1VvASs7uJkaMhyuyiB4u59yfmg"
+            "?e=arq4kQ"
+        ),
+        "semanas": {
+            52: "PEGA_AQUI_LINK_PINTURA_SEMANA_52",
+            51: "PEGA_AQUI_LINK_PINTURA_SEMANA_51",
+            50: "PEGA_AQUI_LINK_PINTURA_SEMANA_50",
+            49: "PEGA_AQUI_LINK_PINTURA_SEMANA_49",
+            48: "PEGA_AQUI_LINK_PINTURA_SEMANA_48",
+            47: "PEGA_AQUI_LINK_PINTURA_SEMANA_47",
+            46: "PEGA_AQUI_LINK_PINTURA_SEMANA_46",
+            45: "PEGA_AQUI_LINK_PINTURA_SEMANA_45",
+            44: "PEGA_AQUI_LINK_PINTURA_SEMANA_44",
+            43: "PEGA_AQUI_LINK_PINTURA_SEMANA_43",
+            42: "PEGA_AQUI_LINK_PINTURA_SEMANA_42",
+            41: "PEGA_AQUI_LINK_PINTURA_SEMANA_41",
+            40: "PEGA_AQUI_LINK_PINTURA_SEMANA_40",
+            39: "PEGA_AQUI_LINK_PINTURA_SEMANA_39",
+            38: "PEGA_AQUI_LINK_PINTURA_SEMANA_38",
+            37: "PEGA_AQUI_LINK_PINTURA_SEMANA_37",
+            36: "PEGA_AQUI_LINK_PINTURA_SEMANA_36",
+            35: "PEGA_AQUI_LINK_PINTURA_SEMANA_35",
+            34: "PEGA_AQUI_LINK_PINTURA_SEMANA_34",
+            33: "PEGA_AQUI_LINK_PINTURA_SEMANA_33",
+            32: "PEGA_AQUI_LINK_PINTURA_SEMANA_32",
+            31: "PEGA_AQUI_LINK_PINTURA_SEMANA_31",
+            30: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgD5fDkVuufvTKx6kBym0MeaAZnOJbTSJCSY86LmBoaYFj8?e=c6xVrP",
+            29: "PEGA_AQUI_LINK_PINTURA_SEMANA_29",
+            28: "PEGA_AQUI_LINK_PINTURA_SEMANA_28",
+            27: "PEGA_AQUI_LINK_PINTURA_SEMANA_27",
+            26: "PEGA_AQUI_LINK_PINTURA_SEMANA_26",
+            25: "PEGA_AQUI_LINK_PINTURA_SEMANA_25",
+            24: "PEGA_AQUI_LINK_PINTURA_SEMANA_24",
+            23: "PEGA_AQUI_LINK_PINTURA_SEMANA_23",
+            22: "PEGA_AQUI_LINK_PINTURA_SEMANA_22",
+            21: "PEGA_AQUI_LINK_PINTURA_SEMANA_21",
+            20: "PEGA_AQUI_LINK_PINTURA_SEMANA_20",
+            19: "PEGA_AQUI_LINK_PINTURA_SEMANA_19",
+            18: "PEGA_AQUI_LINK_PINTURA_SEMANA_18",
+            17: "PEGA_AQUI_LINK_PINTURA_SEMANA_17",
+            16: "PEGA_AQUI_LINK_PINTURA_SEMANA_16",
+            15: "PEGA_AQUI_LINK_PINTURA_SEMANA_15",
+            14: "PEGA_AQUI_LINK_PINTURA_SEMANA_14",
+            13: "PEGA_AQUI_LINK_PINTURA_SEMANA_13",
+            12: "PEGA_AQUI_LINK_PINTURA_SEMANA_12",
+            11: "PEGA_AQUI_LINK_PINTURA_SEMANA_11",
+            10: "PEGA_AQUI_LINK_PINTURA_SEMANA_10",
+            9: "PEGA_AQUI_LINK_PINTURA_SEMANA_09",
+            8: "PEGA_AQUI_LINK_PINTURA_SEMANA_08",
+            7: "PEGA_AQUI_LINK_PINTURA_SEMANA_07",
+            6: "PEGA_AQUI_LINK_PINTURA_SEMANA_06",
+            5: "PEGA_AQUI_LINK_PINTURA_SEMANA_05",
+            4: "PEGA_AQUI_LINK_PINTURA_SEMANA_04",
+            3: "PEGA_AQUI_LINK_PINTURA_SEMANA_03",
+            2: "PEGA_AQUI_LINK_PINTURA_SEMANA_02",
+            1: "PEGA_AQUI_LINK_PINTURA_SEMANA_01",
+        },
+    },
+
+    "eco_custom": {
+        "nombre": "Eco-Custom",
+        "icono": "🟢",
+        "carpeta_principal": (
+            "https://grupometalsa.sharepoint.com/:f:/s/"
+            "MMSMantenimientoEquiposVC/"
+            "IgALS5AeIWqPSLwafaRf_VdsAV3NAu2Cqh_t1aCF-2WhDeA"
+            "?e=VYlpYc"
+        ),
+        "semanas": {
+            52: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_52",
+            51: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_51",
+            50: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_50",
+            49: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_49",
+            48: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_48",
+            47: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_47",
+            46: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_46",
+            45: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_45",
+            44: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_44",
+            43: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_43",
+            42: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_42",
+            41: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_41",
+            40: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_40",
+            39: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_39",
+            38: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_38",
+            37: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_37",
+            36: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_36",
+            35: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_35",
+            34: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_34",
+            33: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_33",
+            32: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_32",
+            31: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_31",
+            30: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgBjjKMdkc7TSaVfWMqECMeOAR_0MumX1VwULaiIihneLHI?e=6hqh2R",
+            29: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_29",
+            28: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_28",
+            27: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_27",
+            26: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_26",
+            25: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_25",
+            24: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_24",
+            23: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_23",
+            22: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_22",
+            21: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_21",
+            20: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_20",
+            19: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_19",
+            18: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_18",
+            17: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_17",
+            16: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_16",
+            15: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_15",
+            14: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_14",
+            13: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_13",
+            12: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_12",
+            11: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_11",
+            10: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_10",
+            9: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_09",
+            8: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_08",
+            7: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_07",
+            6: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_06",
+            5: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_05",
+            4: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_04",
+            3: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_03",
+            2: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_02",
+            1: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_01",
+        },
+    },
 }
 
 
 # ============================================================
-# OBTENER SOLO LAS SEMANAS CON ENLACE CONFIGURADO
+# OBTENER SEMANAS CONFIGURADAS
 # ============================================================
 
-def obtener_carpetas_configuradas() -> dict[int, str]:
+def obtener_semanas_configuradas(clave_area: str) -> dict[int, str]:
 
-    carpetas_configuradas = {}
+    area = AREAS.get(clave_area)
 
-    for numero_semana, enlace in CARPETAS_SEMANALES.items():
+    if not area:
+        return {}
+
+    semanas_configuradas = {}
+
+    for numero_semana, enlace in area["semanas"].items():
 
         enlace = enlace.strip()
 
         if not enlace:
             continue
 
-        if enlace.startswith("PEGA_AQUI_LINK_SEMANA_"):
+        if enlace.startswith("PEGA_AQUI_LINK_"):
             continue
 
         if not enlace.startswith(("https://", "http://")):
             continue
 
-        carpetas_configuradas[numero_semana] = enlace
+        semanas_configuradas[numero_semana] = enlace
 
-    return carpetas_configuradas
+    return semanas_configuradas
 
 
 # ============================================================
-# CREAR MENÚ PAGINADO
+# MENÚ DE ÁREAS
 # ============================================================
 
-def crear_menu_semanas(pagina: int = 0) -> InlineKeyboardMarkup:
+def crear_menu_areas() -> InlineKeyboardMarkup:
 
-    carpetas = obtener_carpetas_configuradas()
+    botones = []
 
-    semanas = sorted(
-        carpetas.keys(),
-        reverse=True,
-    )
+    for clave_area, datos_area in AREAS.items():
 
-    total_semanas = len(semanas)
-
-    if total_semanas == 0:
-        return InlineKeyboardMarkup(
+        botones.append(
             [
-                [
-                    InlineKeyboardButton(
-                        text="⚠️ No hay semanas configuradas",
-                        callback_data="sin_semanas",
-                    )
-                ]
+                InlineKeyboardButton(
+                    text=(
+                        f"{datos_area['icono']} "
+                        f"{datos_area['nombre']}"
+                    ),
+                    callback_data=f"area:{clave_area}",
+                )
             ]
         )
 
+    return InlineKeyboardMarkup(botones)
+
+
+# ============================================================
+# MENÚ SEMANAL DEL ÁREA
+# ============================================================
+
+def crear_menu_semanas(
+    clave_area: str,
+    pagina: int = 0,
+) -> InlineKeyboardMarkup:
+
+    area = AREAS.get(clave_area)
+
+    if not area:
+        return crear_menu_areas()
+
+    semanas_configuradas = obtener_semanas_configuradas(
+        clave_area
+    )
+
+    semanas = sorted(
+        semanas_configuradas.keys(),
+        reverse=True,
+    )
+
+    botones = [
+        [
+            InlineKeyboardButton(
+                text="📂 Abrir carpeta principal del área",
+                url=area["carpeta_principal"],
+            )
+        ]
+    ]
+
+    if not semanas:
+
+        botones.append(
+            [
+                InlineKeyboardButton(
+                    text="⚠️ No hay semanas configuradas",
+                    callback_data="sin_semanas",
+                )
+            ]
+        )
+
+        botones.append(
+            [
+                InlineKeyboardButton(
+                    text="⬅ Volver a las áreas",
+                    callback_data="volver_areas",
+                )
+            ]
+        )
+
+        return InlineKeyboardMarkup(botones)
+
     total_paginas = ceil(
-        total_semanas / SEMANAS_POR_PAGINA
+        len(semanas) / SEMANAS_POR_PAGINA
     )
 
     pagina = max(
@@ -164,39 +294,36 @@ def crear_menu_semanas(pagina: int = 0) -> InlineKeyboardMarkup:
         min(pagina, total_paginas - 1),
     )
 
-    posicion_inicial = pagina * SEMANAS_POR_PAGINA
-    posicion_final = posicion_inicial + SEMANAS_POR_PAGINA
+    inicio = pagina * SEMANAS_POR_PAGINA
+    fin = inicio + SEMANAS_POR_PAGINA
 
-    semanas_visibles = semanas[
-        posicion_inicial:posicion_final
-    ]
+    semanas_visibles = semanas[inicio:fin]
 
-    botones = []
-
-    # Botones de las carpetas
     for numero_semana in semanas_visibles:
 
         botones.append(
             [
                 InlineKeyboardButton(
                     text=f"📁 SEMANA {numero_semana:02d}",
-                    url=carpetas[numero_semana],
+                    url=semanas_configuradas[numero_semana],
                 )
             ]
         )
 
-    # Botones de navegación
-    botones_navegacion = []
+    navegacion = []
 
     if pagina > 0:
-        botones_navegacion.append(
+
+        navegacion.append(
             InlineKeyboardButton(
                 text="◀ Anterior",
-                callback_data=f"pagina:{pagina - 1}",
+                callback_data=(
+                    f"semanas:{clave_area}:{pagina - 1}"
+                ),
             )
         )
 
-    botones_navegacion.append(
+    navegacion.append(
         InlineKeyboardButton(
             text=f"{pagina + 1} de {total_paginas}",
             callback_data="pagina_actual",
@@ -204,20 +331,23 @@ def crear_menu_semanas(pagina: int = 0) -> InlineKeyboardMarkup:
     )
 
     if pagina < total_paginas - 1:
-        botones_navegacion.append(
+
+        navegacion.append(
             InlineKeyboardButton(
                 text="Siguiente ▶",
-                callback_data=f"pagina:{pagina + 1}",
+                callback_data=(
+                    f"semanas:{clave_area}:{pagina + 1}"
+                ),
             )
         )
 
-    botones.append(botones_navegacion)
+    botones.append(navegacion)
 
     botones.append(
         [
             InlineKeyboardButton(
-                text="🔄 Actualizar",
-                callback_data=f"pagina:{pagina}",
+                text="⬅ Volver a las áreas",
+                callback_data="volver_areas",
             )
         ]
     )
@@ -239,8 +369,8 @@ async def iniciar(
 
     await update.message.reply_text(
         "🤖 *Bot de Planeación activo*\n\n"
-        "Utiliza el comando /semanas para consultar "
-        "las carpetas de Órdenes de Trabajo Semanales.",
+        "Utiliza el comando /semanas para consultar las "
+        "carpetas de Órdenes de Trabajo Semanales.",
         parse_mode="Markdown",
     )
 
@@ -249,7 +379,7 @@ async def iniciar(
 # COMANDO /SEMANAS
 # ============================================================
 
-async def mostrar_semanas(
+async def mostrar_areas(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
@@ -257,28 +387,61 @@ async def mostrar_semanas(
     if update.message is None:
         return
 
-    carpetas = obtener_carpetas_configuradas()
-
-    if not carpetas:
-        await update.message.reply_text(
-            "⚠️ No hay carpetas semanales configuradas.\n\n"
-            "Agrega los enlaces de SharePoint dentro del archivo "
-            "`Planneador_Bot.py`.",
-            parse_mode="Markdown",
-        )
-        return
-
     await update.message.reply_text(
         "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\n"
-        "Selecciona la semana correspondiente en la que "
-        "deseas trabajar:",
-        reply_markup=crear_menu_semanas(0),
+        "Selecciona el área:",
+        reply_markup=crear_menu_areas(),
         parse_mode="Markdown",
     )
 
 
 # ============================================================
-# CAMBIAR DE PÁGINA
+# SELECCIONAR ÁREA
+# ============================================================
+
+async def seleccionar_area(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+
+    consulta = update.callback_query
+
+    if consulta is None:
+        return
+
+    await consulta.answer()
+
+    datos = consulta.data or ""
+
+    try:
+        clave_area = datos.split(":")[1]
+
+    except IndexError:
+        return
+
+    area = AREAS.get(clave_area)
+
+    if not area:
+        return
+
+    await consulta.edit_message_text(
+        text=(
+            "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\n"
+            f"Área seleccionada: "
+            f"*{area['nombre']}*\n\n"
+            "Selecciona la semana correspondiente en la que "
+            "deseas trabajar:"
+        ),
+        reply_markup=crear_menu_semanas(
+            clave_area,
+            0,
+        ),
+        parse_mode="Markdown",
+    )
+
+
+# ============================================================
+# CAMBIAR PÁGINA SEMANAL
 # ============================================================
 
 async def cambiar_pagina(
@@ -294,28 +457,67 @@ async def cambiar_pagina(
     datos = consulta.data or ""
 
     if datos == "pagina_actual":
+
         await consulta.answer(
             "Indicador de página."
         )
+
         return
 
     if datos == "sin_semanas":
+
         await consulta.answer(
-            "No hay semanas configuradas.",
+            "Todavía no hay semanas configuradas para esta área.",
             show_alert=True,
         )
+
         return
 
     await consulta.answer()
 
     try:
-        pagina = int(datos.split(":")[1])
+        _, clave_area, pagina_texto = datos.split(":")
+        pagina = int(pagina_texto)
 
-    except (IndexError, ValueError):
-        pagina = 0
+    except (ValueError, IndexError):
+        return
+
+    area = AREAS.get(clave_area)
+
+    if not area:
+        return
 
     await consulta.edit_message_reply_markup(
-        reply_markup=crear_menu_semanas(pagina)
+        reply_markup=crear_menu_semanas(
+            clave_area,
+            pagina,
+        )
+    )
+
+
+# ============================================================
+# VOLVER AL MENÚ DE ÁREAS
+# ============================================================
+
+async def volver_areas(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+
+    consulta = update.callback_query
+
+    if consulta is None:
+        return
+
+    await consulta.answer()
+
+    await consulta.edit_message_text(
+        text=(
+            "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\n"
+            "Selecciona el área:"
+        ),
+        reply_markup=crear_menu_areas(),
+        parse_mode="Markdown",
     )
 
 
@@ -341,11 +543,13 @@ async def manejar_error(
 def main() -> None:
 
     if not TOKEN:
+
         raise ValueError(
             "No se encontró la variable TELEGRAM_BOT_TOKEN."
         )
 
     if not URL_RENDER:
+
         raise ValueError(
             "No se encontró la variable RENDER_EXTERNAL_URL."
         )
@@ -366,14 +570,28 @@ def main() -> None:
     aplicacion.add_handler(
         CommandHandler(
             "semanas",
-            mostrar_semanas,
+            mostrar_areas,
+        )
+    )
+
+    aplicacion.add_handler(
+        CallbackQueryHandler(
+            seleccionar_area,
+            pattern=r"^area:",
         )
     )
 
     aplicacion.add_handler(
         CallbackQueryHandler(
             cambiar_pagina,
-            pattern=r"^(pagina:|pagina_actual|sin_semanas)",
+            pattern=r"^(semanas:|pagina_actual|sin_semanas)",
+        )
+    )
+
+    aplicacion.add_handler(
+        CallbackQueryHandler(
+            volver_areas,
+            pattern=r"^volver_areas$",
         )
     )
 
