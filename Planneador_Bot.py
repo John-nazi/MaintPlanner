@@ -1,6 +1,8 @@
+import asyncio
 import logging
 import os
-import asyncio
+import re
+import unicodedata
 from math import ceil
 
 from telegram import (
@@ -13,6 +15,8 @@ from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
+    MessageHandler,
+    filters,
 )
 
 # ============================================================
@@ -30,10 +34,47 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 PUERTO = int(os.getenv("PORT", "10000"))
 URL_RENDER = os.getenv("RENDER_EXTERNAL_URL")
 
+# Semanas visibles por página
 SEMANAS_POR_PAGINA = 6
 
-# Tiempo antes de borrar los mensajes del bot
-TIEMPO_BORRADO = 60
+# Tiempo para borrar los mensajes normales enviados por el bot
+TIEMPO_BORRADO_MENSAJES_BOT = 60
+
+# Tiempo para borrar el aviso por lenguaje ofensivo
+TIEMPO_BORRADO_AVISO = 15
+
+# Mostrar aviso cuando se elimine un mensaje
+MOSTRAR_AVISO_OFENSIVO = True
+
+
+# ============================================================
+# PALABRAS OFENSIVAS
+# ============================================================
+# Puedes agregar o quitar palabras.
+# No importa si el usuario escribe mayúsculas o acentos.
+
+PALABRAS_PROHIBIDAS = [
+    "puta",
+    "puto",
+    "pendejo",
+    "pendeja",
+    "imbecil",
+    "idiota",
+    "cabron",
+    "cabrona",
+    "culero",
+    "culera",
+    "chingada",
+    "chingado",
+    "jodete",
+    "mierda",
+    "verga",
+    "pinche",
+
+    # Agrega más aquí:
+    # "palabra",
+    # "otra palabra",
+]
 
 
 # ============================================================
@@ -41,9 +82,15 @@ TIEMPO_BORRADO = 60
 # ============================================================
 
 AREAS = {
+
+    # --------------------------------------------------------
+    # PINTURA Y SECUENCIADO
+    # --------------------------------------------------------
+
     "pintura": {
         "nombre": "Pintura y Secuenciado",
         "icono": "🔴",
+
         "semanas": {
             52: "PEGA_AQUI_LINK_PINTURA_SEMANA_52",
             51: "PEGA_AQUI_LINK_PINTURA_SEMANA_51",
@@ -100,9 +147,14 @@ AREAS = {
         },
     },
 
+    # --------------------------------------------------------
+    # ECO-CUSTOM
+    # --------------------------------------------------------
+
     "eco_custom": {
         "nombre": "Eco-Custom",
         "icono": "🟢",
+
         "semanas": {
             52: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_52",
             51: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_51",
@@ -162,16 +214,17 @@ AREAS = {
 
 
 # ============================================================
-# BORRAR MENSAJE AUTOMÁTICAMENTE
+# BORRAR MENSAJES AUTOMÁTICAMENTE
 # ============================================================
 
 async def borrar_mensaje_despues(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int,
     message_id: int,
+    segundos: int,
 ) -> None:
 
-    await asyncio.sleep(TIEMPO_BORRADO)
+    await asyncio.sleep(segundos)
 
     try:
         await context.bot.delete_message(
@@ -191,6 +244,7 @@ def programar_borrado(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int,
     message_id: int,
+    segundos: int,
 ) -> None:
 
     context.application.create_task(
@@ -198,15 +252,136 @@ def programar_borrado(
             context,
             chat_id,
             message_id,
+            segundos,
         )
     )
+
+
+# ============================================================
+# NORMALIZAR TEXTO
+# ============================================================
+
+def normalizar_texto(texto: str) -> str:
+
+    texto = texto.lower()
+
+    texto = unicodedata.normalize(
+        "NFD",
+        texto,
+    )
+
+    texto = "".join(
+        caracter
+        for caracter in texto
+        if unicodedata.category(caracter) != "Mn"
+    )
+
+    return texto
+
+
+# ============================================================
+# DETECTAR PALABRAS OFENSIVAS
+# ============================================================
+
+def contiene_palabra_prohibida(texto: str) -> bool:
+
+    texto_normalizado = normalizar_texto(texto)
+
+    for palabra in PALABRAS_PROHIBIDAS:
+
+        palabra_normalizada = normalizar_texto(
+            palabra.strip()
+        )
+
+        if not palabra_normalizada:
+            continue
+
+        patron = (
+            r"(?<!\w)"
+            + re.escape(palabra_normalizada)
+            + r"(?!\w)"
+        )
+
+        if re.search(
+            patron,
+            texto_normalizado,
+            flags=re.IGNORECASE,
+        ):
+            return True
+
+    return False
+
+
+# ============================================================
+# MODERAR MENSAJES DEL GRUPO
+# ============================================================
+
+async def moderar_mensaje(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+
+    mensaje = update.message
+
+    if mensaje is None:
+        return
+
+    # Ignorar mensajes enviados por bots
+    if mensaje.from_user and mensaje.from_user.is_bot:
+        return
+
+    texto = mensaje.text or mensaje.caption or ""
+
+    if not texto:
+        return
+
+    if not contiene_palabra_prohibida(texto):
+        return
+
+    try:
+
+        await mensaje.delete()
+
+        logger.info(
+            "Mensaje ofensivo eliminado en chat %s.",
+            mensaje.chat_id,
+        )
+
+    except Exception as error:
+
+        logger.warning(
+            "No se pudo eliminar el mensaje ofensivo: %s",
+            error,
+        )
+
+        return
+
+    # Aviso temporal
+    if MOSTRAR_AVISO_OFENSIVO:
+
+        aviso = await context.bot.send_message(
+            chat_id=mensaje.chat_id,
+            text=(
+                "⚠️ Mensaje eliminado por contener "
+                "lenguaje no permitido."
+            ),
+        )
+
+        programar_borrado(
+            context,
+            aviso.chat_id,
+            aviso.message_id,
+            TIEMPO_BORRADO_AVISO,
+        )
 
 
 # ============================================================
 # OBTENER SEMANAS CONFIGURADAS
 # ============================================================
 
-def obtener_semanas_configuradas(clave_area: str) -> dict[int, str]:
+def obtener_semanas_configuradas(
+    clave_area: str,
+) -> dict[int, str]:
 
     area = AREAS.get(clave_area)
 
@@ -225,10 +400,14 @@ def obtener_semanas_configuradas(clave_area: str) -> dict[int, str]:
         if enlace.startswith("PEGA_AQUI_LINK_"):
             continue
 
-        if not enlace.startswith(("https://", "http://")):
+        if not enlace.startswith(
+            ("https://", "http://")
+        ):
             continue
 
-        semanas_configuradas[numero_semana] = enlace
+        semanas_configuradas[
+            numero_semana
+        ] = enlace
 
     return semanas_configuradas
 
@@ -246,7 +425,10 @@ def crear_menu_areas() -> InlineKeyboardMarkup:
         botones.append(
             [
                 InlineKeyboardButton(
-                    text=f"{datos_area['icono']} {datos_area['nombre']}",
+                    text=(
+                        f"{datos_area['icono']} "
+                        f"{datos_area['nombre']}"
+                    ),
                     callback_data=f"area:{clave_area}",
                 )
             ]
@@ -264,8 +446,10 @@ def crear_menu_semanas(
     pagina: int = 0,
 ) -> InlineKeyboardMarkup:
 
-    semanas_configuradas = obtener_semanas_configuradas(
-        clave_area
+    semanas_configuradas = (
+        obtener_semanas_configuradas(
+            clave_area
+        )
     )
 
     semanas = sorted(
@@ -303,21 +487,40 @@ def crear_menu_semanas(
 
     pagina = max(
         0,
-        min(pagina, total_paginas - 1),
+        min(
+            pagina,
+            total_paginas - 1,
+        ),
     )
 
-    inicio = pagina * SEMANAS_POR_PAGINA
-    fin = inicio + SEMANAS_POR_PAGINA
+    inicio = (
+        pagina
+        * SEMANAS_POR_PAGINA
+    )
 
-    semanas_visibles = semanas[inicio:fin]
+    fin = (
+        inicio
+        + SEMANAS_POR_PAGINA
+    )
+
+    semanas_visibles = semanas[
+        inicio:fin
+    ]
 
     for numero_semana in semanas_visibles:
 
         botones.append(
             [
                 InlineKeyboardButton(
-                    text=f"📁 SEMANA {numero_semana:02d}",
-                    url=semanas_configuradas[numero_semana],
+                    text=(
+                        f"📁 SEMANA "
+                        f"{numero_semana:02d}"
+                    ),
+                    url=(
+                        semanas_configuradas[
+                            numero_semana
+                        ]
+                    ),
                 )
             ]
         )
@@ -329,13 +532,20 @@ def crear_menu_semanas(
         navegacion.append(
             InlineKeyboardButton(
                 text="◀ Anterior",
-                callback_data=f"semanas:{clave_area}:{pagina - 1}",
+                callback_data=(
+                    f"semanas:"
+                    f"{clave_area}:"
+                    f"{pagina - 1}"
+                ),
             )
         )
 
     navegacion.append(
         InlineKeyboardButton(
-            text=f"{pagina + 1} de {total_paginas}",
+            text=(
+                f"{pagina + 1} "
+                f"de {total_paginas}"
+            ),
             callback_data="pagina_actual",
         )
     )
@@ -345,7 +555,11 @@ def crear_menu_semanas(
         navegacion.append(
             InlineKeyboardButton(
                 text="Siguiente ▶",
-                callback_data=f"semanas:{clave_area}:{pagina + 1}",
+                callback_data=(
+                    f"semanas:"
+                    f"{clave_area}:"
+                    f"{pagina + 1}"
+                ),
             )
         )
 
@@ -377,8 +591,8 @@ async def iniciar(
 
     mensaje = await update.message.reply_text(
         "🤖 *Bot de Planeación activo*\n\n"
-        "Utiliza el comando /areas para consultar las "
-        "carpetas de Órdenes de Trabajo Semanales.",
+        "Utiliza el comando /areas para consultar "
+        "las carpetas de Órdenes de Trabajo Semanales.",
         parse_mode="Markdown",
     )
 
@@ -386,6 +600,7 @@ async def iniciar(
         context,
         mensaje.chat_id,
         mensaje.message_id,
+        TIEMPO_BORRADO_MENSAJES_BOT,
     )
 
 
@@ -412,6 +627,7 @@ async def mostrar_areas(
         context,
         mensaje.chat_id,
         mensaje.message_id,
+        TIEMPO_BORRADO_MENSAJES_BOT,
     )
 
 
@@ -448,8 +664,8 @@ async def seleccionar_area(
         text=(
             "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\n"
             f"Área seleccionada: *{area['nombre']}*\n\n"
-            "Selecciona la semana correspondiente en la que "
-            "deseas trabajar:"
+            "Selecciona la semana correspondiente "
+            "en la que deseas trabajar:"
         ),
         reply_markup=crear_menu_semanas(
             clave_area,
@@ -486,7 +702,8 @@ async def cambiar_pagina(
     if datos == "sin_semanas":
 
         await consulta.answer(
-            "Todavía no hay semanas configuradas para esta área.",
+            "Todavía no hay semanas "
+            "configuradas para esta área.",
             show_alert=True,
         )
 
@@ -495,8 +712,14 @@ async def cambiar_pagina(
     await consulta.answer()
 
     try:
-        _, clave_area, pagina_texto = datos.split(":")
-        pagina = int(pagina_texto)
+
+        _, clave_area, pagina_texto = (
+            datos.split(":")
+        )
+
+        pagina = int(
+            pagina_texto
+        )
 
     except (ValueError, IndexError):
         return
@@ -510,7 +733,7 @@ async def cambiar_pagina(
 
 
 # ============================================================
-# VOLVER A ÁREAS
+# VOLVER AL MENÚ DE ÁREAS
 # ============================================================
 
 async def volver_areas(
@@ -558,12 +781,14 @@ def main() -> None:
 
     if not TOKEN:
         raise ValueError(
-            "No se encontró la variable TELEGRAM_BOT_TOKEN."
+            "No se encontró la variable "
+            "TELEGRAM_BOT_TOKEN."
         )
 
     if not URL_RENDER:
         raise ValueError(
-            "No se encontró la variable RENDER_EXTERNAL_URL."
+            "No se encontró la variable "
+            "RENDER_EXTERNAL_URL."
         )
 
     aplicacion = (
@@ -571,6 +796,10 @@ def main() -> None:
         .token(TOKEN)
         .build()
     )
+
+    # --------------------------------------------------------
+    # COMANDOS
+    # --------------------------------------------------------
 
     aplicacion.add_handler(
         CommandHandler(
@@ -586,6 +815,10 @@ def main() -> None:
         )
     )
 
+    # --------------------------------------------------------
+    # BOTONES
+    # --------------------------------------------------------
+
     aplicacion.add_handler(
         CallbackQueryHandler(
             seleccionar_area,
@@ -596,7 +829,11 @@ def main() -> None:
     aplicacion.add_handler(
         CallbackQueryHandler(
             cambiar_pagina,
-            pattern=r"^(semanas:|pagina_actual|sin_semanas)",
+            pattern=(
+                r"^(semanas:|"
+                r"pagina_actual|"
+                r"sin_semanas)"
+            ),
         )
     )
 
@@ -607,15 +844,47 @@ def main() -> None:
         )
     )
 
+    # --------------------------------------------------------
+    # MODERACIÓN AUTOMÁTICA
+    # --------------------------------------------------------
+
+    aplicacion.add_handler(
+        MessageHandler(
+            (
+                filters.TEXT
+                | filters.CaptionRegex(r".+")
+            )
+            & ~filters.COMMAND,
+            moderar_mensaje,
+        )
+    )
+
+    # --------------------------------------------------------
+    # ERRORES
+    # --------------------------------------------------------
+
     aplicacion.add_error_handler(
         manejar_error
     )
 
-    ruta_webhook = "telegram"
-    url_webhook = f"{URL_RENDER}/{ruta_webhook}"
+    # --------------------------------------------------------
+    # WEBHOOK RENDER
+    # --------------------------------------------------------
 
-    print("Bot de Planeación activo.")
-    print(f"Webhook activo: {url_webhook}")
+    ruta_webhook = "telegram"
+
+    url_webhook = (
+        f"{URL_RENDER}/"
+        f"{ruta_webhook}"
+    )
+
+    print(
+        "Bot de Planeación activo."
+    )
+
+    print(
+        f"Webhook activo: {url_webhook}"
+    )
 
     aplicacion.run_webhook(
         listen="0.0.0.0",
