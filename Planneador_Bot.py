@@ -25,33 +25,21 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# Variables configuradas en Render
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 PUERTO = int(os.getenv("PORT", "10000"))
 URL_RENDER = os.getenv("RENDER_EXTERNAL_URL")
 
-# Cantidad de semanas visibles por página
 SEMANAS_POR_PAGINA = 6
 
 
 # ============================================================
 # ÁREAS Y CARPETAS SEMANALES
 # ============================================================
-# Reemplaza PEGA_AQUI_LINK... por el vínculo real de SharePoint.
-#
-# Las semanas que todavía tengan el texto de ejemplo
-# no aparecerán en Telegram.
 
 AREAS = {
     "pintura": {
         "nombre": "Pintura y Secuenciado",
         "icono": "🔴",
-        "carpeta_principal": (
-            "https://grupometalsa.sharepoint.com/:f:/s/"
-            "MMSMantenimientoEquiposVC/"
-            "IgDFBQ_mM4vTSY0XMhO1O1VvASs7uJkaMhyuyiB4u59yfmg"
-            "?e=arq4kQ"
-        ),
         "semanas": {
             52: "PEGA_AQUI_LINK_PINTURA_SEMANA_52",
             51: "PEGA_AQUI_LINK_PINTURA_SEMANA_51",
@@ -75,7 +63,7 @@ AREAS = {
             33: "PEGA_AQUI_LINK_PINTURA_SEMANA_33",
             32: "PEGA_AQUI_LINK_PINTURA_SEMANA_32",
             31: "PEGA_AQUI_LINK_PINTURA_SEMANA_31",
-            30: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgD5fDkVuufvTKx6kBym0MeaAZnOJbTSJCSY86LmBoaYFj8?e=c6xVrP",
+            30: "PEGA_AQUI_LINK_PINTURA_SEMANA_30",
             29: "PEGA_AQUI_LINK_PINTURA_SEMANA_29",
             28: "PEGA_AQUI_LINK_PINTURA_SEMANA_28",
             27: "PEGA_AQUI_LINK_PINTURA_SEMANA_27",
@@ -111,12 +99,6 @@ AREAS = {
     "eco_custom": {
         "nombre": "Eco-Custom",
         "icono": "🟢",
-        "carpeta_principal": (
-            "https://grupometalsa.sharepoint.com/:f:/s/"
-            "MMSMantenimientoEquiposVC/"
-            "IgALS5AeIWqPSLwafaRf_VdsAV3NAu2Cqh_t1aCF-2WhDeA"
-            "?e=VYlpYc"
-        ),
         "semanas": {
             52: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_52",
             51: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_51",
@@ -140,7 +122,7 @@ AREAS = {
             33: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_33",
             32: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_32",
             31: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_31",
-            30: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgBjjKMdkc7TSaVfWMqECMeOAR_0MumX1VwULaiIihneLHI?e=6hqh2R",
+            30: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_30",
             29: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_29",
             28: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_28",
             27: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_27",
@@ -219,10 +201,7 @@ def crear_menu_areas() -> InlineKeyboardMarkup:
         botones.append(
             [
                 InlineKeyboardButton(
-                    text=(
-                        f"{datos_area['icono']} "
-                        f"{datos_area['nombre']}"
-                    ),
+                    text=f"{datos_area['icono']} {datos_area['nombre']}",
                     callback_data=f"area:{clave_area}",
                 )
             ]
@@ -232,7 +211,7 @@ def crear_menu_areas() -> InlineKeyboardMarkup:
 
 
 # ============================================================
-# MENÚ SEMANAL DEL ÁREA
+# MENÚ DE SEMANAS
 # ============================================================
 
 def crear_menu_semanas(
@@ -254,7 +233,8 @@ def crear_menu_semanas(
         reverse=True,
     )
 
-
+    # YA NO SE MUESTRA EL BOTÓN DE CARPETA PRINCIPAL
+    botones = []
 
     if not semanas:
 
@@ -310,9 +290,7 @@ def crear_menu_semanas(
         navegacion.append(
             InlineKeyboardButton(
                 text="◀ Anterior",
-                callback_data=(
-                    f"semanas:{clave_area}:{pagina - 1}"
-                ),
+                callback_data=f"semanas:{clave_area}:{pagina - 1}",
             )
         )
 
@@ -328,9 +306,7 @@ def crear_menu_semanas(
         navegacion.append(
             InlineKeyboardButton(
                 text="Siguiente ▶",
-                callback_data=(
-                    f"semanas:{clave_area}:{pagina + 1}"
-                ),
+                callback_data=f"semanas:{clave_area}:{pagina + 1}",
             )
         )
 
@@ -369,7 +345,7 @@ async def iniciar(
 
 
 # ============================================================
-# COMANDO /SEMANAS
+# COMANDO /AREAS
 # ============================================================
 
 async def mostrar_areas(
@@ -420,8 +396,7 @@ async def seleccionar_area(
     await consulta.edit_message_text(
         text=(
             "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\n"
-            f"Área seleccionada: "
-            f"*{area['nombre']}*\n\n"
+            f"Área seleccionada: *{area['nombre']}*\n\n"
             "Selecciona la semana correspondiente en la que "
             "deseas trabajar:"
         ),
@@ -434,7 +409,7 @@ async def seleccionar_area(
 
 
 # ============================================================
-# CAMBIAR PÁGINA SEMANAL
+# CAMBIAR PÁGINA
 # ============================================================
 
 async def cambiar_pagina(
@@ -475,11 +450,6 @@ async def cambiar_pagina(
     except (ValueError, IndexError):
         return
 
-    area = AREAS.get(clave_area)
-
-    if not area:
-        return
-
     await consulta.edit_message_reply_markup(
         reply_markup=crear_menu_semanas(
             clave_area,
@@ -489,7 +459,7 @@ async def cambiar_pagina(
 
 
 # ============================================================
-# VOLVER AL MENÚ DE ÁREAS
+# VOLVER A ÁREAS
 # ============================================================
 
 async def volver_areas(
@@ -536,13 +506,11 @@ async def manejar_error(
 def main() -> None:
 
     if not TOKEN:
-
         raise ValueError(
             "No se encontró la variable TELEGRAM_BOT_TOKEN."
         )
 
     if not URL_RENDER:
-
         raise ValueError(
             "No se encontró la variable RENDER_EXTERNAL_URL."
         )
@@ -562,7 +530,7 @@ def main() -> None:
 
     aplicacion.add_handler(
         CommandHandler(
-            "Areas",
+            "areas",
             mostrar_areas,
         )
     )
