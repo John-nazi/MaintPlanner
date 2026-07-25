@@ -64,6 +64,9 @@ PALABRAS_PROHIBIDAS = [
     "mierda",
     "verga",
     "pinche",
+    "joto",
+    "gay",
+    "culo"
 
     # Agrega más aquí:
     # "palabra",
