@@ -34,24 +34,18 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 PUERTO = int(os.getenv("PORT", "10000"))
 URL_RENDER = os.getenv("RENDER_EXTERNAL_URL")
 
-# Semanas visibles por página
 SEMANAS_POR_PAGINA = 6
 
-# Tiempo para borrar los mensajes normales enviados por el bot
-TIEMPO_BORRADO_MENSAJES_BOT = 60
+# Tiempo en segundos antes de borrar comandos y mensajes del bot
+TIEMPO_BORRADO = 60
 
-# Tiempo para borrar el aviso por lenguaje ofensivo
+# Tiempo en segundos para borrar avisos de moderación
 TIEMPO_BORRADO_AVISO = 15
 
-# Mostrar aviso cuando se elimine un mensaje
-MOSTRAR_AVISO_OFENSIVO = True
-
 
 # ============================================================
-# PALABRAS OFENSIVAS
+# PALABRAS PROHIBIDAS
 # ============================================================
-# Puedes agregar o quitar palabras.
-# No importa si el usuario escribe mayúsculas o acentos.
 
 PALABRAS_PROHIBIDAS = [
     "puta",
@@ -71,9 +65,8 @@ PALABRAS_PROHIBIDAS = [
     "verga",
     "pinche",
 
-    # Agrega más aquí:
+    # Agrega más palabras aquí:
     # "palabra",
-    # "otra palabra",
 ]
 
 
@@ -83,9 +76,9 @@ PALABRAS_PROHIBIDAS = [
 
 AREAS = {
 
-    # --------------------------------------------------------
+    # ========================================================
     # PINTURA Y SECUENCIADO
-    # --------------------------------------------------------
+    # ========================================================
 
     "pintura": {
         "nombre": "Pintura y Secuenciado",
@@ -147,9 +140,9 @@ AREAS = {
         },
     },
 
-    # --------------------------------------------------------
+    # ========================================================
     # ECO-CUSTOM
-    # --------------------------------------------------------
+    # ========================================================
 
     "eco_custom": {
         "nombre": "Eco-Custom",
@@ -214,7 +207,7 @@ AREAS = {
 
 
 # ============================================================
-# BORRAR MENSAJES AUTOMÁTICAMENTE
+# BORRADO AUTOMÁTICO
 # ============================================================
 
 async def borrar_mensaje_despues(
@@ -244,15 +237,15 @@ def programar_borrado(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int,
     message_id: int,
-    segundos: int,
+    segundos: int = TIEMPO_BORRADO,
 ) -> None:
 
     context.application.create_task(
         borrar_mensaje_despues(
-            context,
-            chat_id,
-            message_id,
-            segundos,
+            context=context,
+            chat_id=chat_id,
+            message_id=message_id,
+            segundos=segundos,
         )
     )
 
@@ -280,7 +273,7 @@ def normalizar_texto(texto: str) -> str:
 
 
 # ============================================================
-# DETECTAR PALABRAS OFENSIVAS
+# DETECTAR PALABRAS PROHIBIDAS
 # ============================================================
 
 def contiene_palabra_prohibida(texto: str) -> bool:
@@ -313,7 +306,7 @@ def contiene_palabra_prohibida(texto: str) -> bool:
 
 
 # ============================================================
-# MODERAR MENSAJES DEL GRUPO
+# MODERAR MENSAJES
 # ============================================================
 
 async def moderar_mensaje(
@@ -326,7 +319,6 @@ async def moderar_mensaje(
     if mensaje is None:
         return
 
-    # Ignorar mensajes enviados por bots
     if mensaje.from_user and mensaje.from_user.is_bot:
         return
 
@@ -339,13 +331,7 @@ async def moderar_mensaje(
         return
 
     try:
-
         await mensaje.delete()
-
-        logger.info(
-            "Mensaje ofensivo eliminado en chat %s.",
-            mensaje.chat_id,
-        )
 
     except Exception as error:
 
@@ -356,23 +342,20 @@ async def moderar_mensaje(
 
         return
 
-    # Aviso temporal
-    if MOSTRAR_AVISO_OFENSIVO:
+    aviso = await context.bot.send_message(
+        chat_id=mensaje.chat_id,
+        text=(
+            "⚠️ Mensaje eliminado por contener "
+            "lenguaje no permitido."
+        ),
+    )
 
-        aviso = await context.bot.send_message(
-            chat_id=mensaje.chat_id,
-            text=(
-                "⚠️ Mensaje eliminado por contener "
-                "lenguaje no permitido."
-            ),
-        )
-
-        programar_borrado(
-            context,
-            aviso.chat_id,
-            aviso.message_id,
-            TIEMPO_BORRADO_AVISO,
-        )
+    programar_borrado(
+        context,
+        aviso.chat_id,
+        aviso.message_id,
+        TIEMPO_BORRADO_AVISO,
+    )
 
 
 # ============================================================
@@ -512,15 +495,8 @@ def crear_menu_semanas(
         botones.append(
             [
                 InlineKeyboardButton(
-                    text=(
-                        f"📁 SEMANA "
-                        f"{numero_semana:02d}"
-                    ),
-                    url=(
-                        semanas_configuradas[
-                            numero_semana
-                        ]
-                    ),
+                    text=f"📁 SEMANA {numero_semana:02d}",
+                    url=semanas_configuradas[numero_semana],
                 )
             ]
         )
@@ -589,18 +565,25 @@ async def iniciar(
     if update.message is None:
         return
 
-    mensaje = await update.message.reply_text(
+    # Borrar /start escrito por el usuario
+    programar_borrado(
+        context,
+        update.message.chat_id,
+        update.message.message_id,
+    )
+
+    mensaje_bot = await update.message.reply_text(
         "🤖 *Bot de Planeación activo*\n\n"
         "Utiliza el comando /areas para consultar "
         "las carpetas de Órdenes de Trabajo Semanales.",
         parse_mode="Markdown",
     )
 
+    # Borrar respuesta del bot
     programar_borrado(
         context,
-        mensaje.chat_id,
-        mensaje.message_id,
-        TIEMPO_BORRADO_MENSAJES_BOT,
+        mensaje_bot.chat_id,
+        mensaje_bot.message_id,
     )
 
 
@@ -616,18 +599,25 @@ async def mostrar_areas(
     if update.message is None:
         return
 
-    mensaje = await update.message.reply_text(
+    # Borrar el /areas escrito por cualquier usuario
+    programar_borrado(
+        context,
+        update.message.chat_id,
+        update.message.message_id,
+    )
+
+    mensaje_bot = await update.message.reply_text(
         "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\n"
         "Selecciona el área:",
         reply_markup=crear_menu_areas(),
         parse_mode="Markdown",
     )
 
+    # Borrar el menú del bot después de 1 minuto
     programar_borrado(
         context,
-        mensaje.chat_id,
-        mensaje.message_id,
-        TIEMPO_BORRADO_MENSAJES_BOT,
+        mensaje_bot.chat_id,
+        mensaje_bot.message_id,
     )
 
 
@@ -702,8 +692,7 @@ async def cambiar_pagina(
     if datos == "sin_semanas":
 
         await consulta.answer(
-            "Todavía no hay semanas "
-            "configuradas para esta área.",
+            "Todavía no hay semanas configuradas para esta área.",
             show_alert=True,
         )
 
@@ -733,7 +722,7 @@ async def cambiar_pagina(
 
 
 # ============================================================
-# VOLVER AL MENÚ DE ÁREAS
+# VOLVER A ÁREAS
 # ============================================================
 
 async def volver_areas(
@@ -781,14 +770,12 @@ def main() -> None:
 
     if not TOKEN:
         raise ValueError(
-            "No se encontró la variable "
-            "TELEGRAM_BOT_TOKEN."
+            "No se encontró la variable TELEGRAM_BOT_TOKEN."
         )
 
     if not URL_RENDER:
         raise ValueError(
-            "No se encontró la variable "
-            "RENDER_EXTERNAL_URL."
+            "No se encontró la variable RENDER_EXTERNAL_URL."
         )
 
     aplicacion = (
@@ -797,9 +784,9 @@ def main() -> None:
         .build()
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # COMANDOS
-    # --------------------------------------------------------
+    # ========================================================
 
     aplicacion.add_handler(
         CommandHandler(
@@ -815,9 +802,9 @@ def main() -> None:
         )
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # BOTONES
-    # --------------------------------------------------------
+    # ========================================================
 
     aplicacion.add_handler(
         CallbackQueryHandler(
@@ -844,9 +831,9 @@ def main() -> None:
         )
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # MODERACIÓN AUTOMÁTICA
-    # --------------------------------------------------------
+    # ========================================================
 
     aplicacion.add_handler(
         MessageHandler(
@@ -859,32 +846,26 @@ def main() -> None:
         )
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # ERRORES
-    # --------------------------------------------------------
+    # ========================================================
 
     aplicacion.add_error_handler(
         manejar_error
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # WEBHOOK RENDER
-    # --------------------------------------------------------
+    # ========================================================
 
     ruta_webhook = "telegram"
 
     url_webhook = (
-        f"{URL_RENDER}/"
-        f"{ruta_webhook}"
+        f"{URL_RENDER}/{ruta_webhook}"
     )
 
-    print(
-        "Bot de Planeación activo."
-    )
-
-    print(
-        f"Webhook activo: {url_webhook}"
-    )
+    print("Bot de Planeación activo.")
+    print(f"Webhook activo: {url_webhook}")
 
     aplicacion.run_webhook(
         listen="0.0.0.0",
