@@ -36,10 +36,10 @@ URL_RENDER = os.getenv("RENDER_EXTERNAL_URL")
 
 SEMANAS_POR_PAGINA = 6
 
-# Tiempo en segundos antes de borrar comandos y mensajes del bot
+# Borrado de /areas, /start y mensajes del bot
 TIEMPO_BORRADO = 60
 
-# Tiempo en segundos para borrar avisos de moderación
+# Aviso de moderación
 TIEMPO_BORRADO_AVISO = 15
 
 
@@ -65,20 +65,16 @@ PALABRAS_PROHIBIDAS = [
     "verga",
     "pinche",
 
-    # Agrega más palabras aquí:
+    # Agrega más aquí:
     # "palabra",
 ]
 
 
 # ============================================================
-# ÁREAS Y CARPETAS SEMANALES
+# ÁREAS
 # ============================================================
 
 AREAS = {
-
-    # ========================================================
-    # PINTURA Y SECUENCIADO
-    # ========================================================
 
     "pintura": {
         "nombre": "Pintura y Secuenciado",
@@ -139,10 +135,6 @@ AREAS = {
             1: "PEGA_AQUI_LINK_PINTURA_SEMANA_01",
         },
     },
-
-    # ========================================================
-    # ECO-CUSTOM
-    # ========================================================
 
     "eco_custom": {
         "nombre": "Eco-Custom",
@@ -207,15 +199,15 @@ AREAS = {
 
 
 # ============================================================
-# BORRADO AUTOMÁTICO
+# BORRAR MENSAJES
 # ============================================================
 
 async def borrar_mensaje_despues(
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int,
-    message_id: int,
-    segundos: int,
-) -> None:
+    context,
+    chat_id,
+    message_id,
+    segundos,
+):
 
     await asyncio.sleep(segundos)
 
@@ -227,25 +219,25 @@ async def borrar_mensaje_despues(
 
     except Exception as error:
         logger.warning(
-            "No se pudo borrar el mensaje %s: %s",
+            "No se pudo borrar mensaje %s: %s",
             message_id,
             error,
         )
 
 
 def programar_borrado(
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int,
-    message_id: int,
-    segundos: int = TIEMPO_BORRADO,
-) -> None:
+    context,
+    chat_id,
+    message_id,
+    segundos=TIEMPO_BORRADO,
+):
 
     context.application.create_task(
         borrar_mensaje_despues(
-            context=context,
-            chat_id=chat_id,
-            message_id=message_id,
-            segundos=segundos,
+            context,
+            chat_id,
+            message_id,
+            segundos,
         )
     )
 
@@ -254,7 +246,7 @@ def programar_borrado(
 # NORMALIZAR TEXTO
 # ============================================================
 
-def normalizar_texto(texto: str) -> str:
+def normalizar_texto(texto):
 
     texto = texto.lower()
 
@@ -263,156 +255,182 @@ def normalizar_texto(texto: str) -> str:
         texto,
     )
 
-    texto = "".join(
+    return "".join(
         caracter
         for caracter in texto
         if unicodedata.category(caracter) != "Mn"
     )
-
-    return texto
 
 
 # ============================================================
 # DETECTAR PALABRAS PROHIBIDAS
 # ============================================================
 
-def contiene_palabra_prohibida(texto: str) -> bool:
+def contiene_palabra_prohibida(texto):
 
-    texto_normalizado = normalizar_texto(texto)
+    texto = normalizar_texto(texto)
 
     for palabra in PALABRAS_PROHIBIDAS:
 
-        palabra_normalizada = normalizar_texto(
+        palabra = normalizar_texto(
             palabra.strip()
         )
 
-        if not palabra_normalizada:
+        if not palabra:
             continue
 
         patron = (
             r"(?<!\w)"
-            + re.escape(palabra_normalizada)
+            + re.escape(palabra)
             + r"(?!\w)"
         )
 
-        if re.search(
-            patron,
-            texto_normalizado,
-            flags=re.IGNORECASE,
-        ):
+        if re.search(patron, texto):
             return True
 
     return False
 
 
 # ============================================================
-# MODERAR MENSAJES
+# MODERACIÓN
 # ============================================================
 
 async def moderar_mensaje(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-) -> None:
+):
 
-    mensaje = update.message
+    # IMPORTANTE:
+    # effective_message permite trabajar también con mensajes
+    # de temas, supergrupos y otras variantes de Telegram.
+    mensaje = update.effective_message
 
     if mensaje is None:
         return
 
-    if mensaje.from_user and mensaje.from_user.is_bot:
-        return
+    texto = (
+        mensaje.text
+        or mensaje.caption
+        or ""
+    )
 
-    texto = mensaje.text or mensaje.caption or ""
+    # Registro temporal para diagnóstico en Render
+    logger.info(
+        "MENSAJE RECIBIDO | chat=%s | tipo=%s | tema=%s | texto=%r",
+        mensaje.chat_id,
+        mensaje.chat.type if mensaje.chat else None,
+        mensaje.message_thread_id,
+        texto,
+    )
 
     if not texto:
+        return
+
+    # No procesar comandos aquí
+    if texto.startswith("/"):
         return
 
     if not contiene_palabra_prohibida(texto):
         return
 
+    logger.info(
+        "PALABRA PROHIBIDA DETECTADA | mensaje=%s",
+        mensaje.message_id,
+    )
+
     try:
-        await mensaje.delete()
+
+        await context.bot.delete_message(
+            chat_id=mensaje.chat_id,
+            message_id=mensaje.message_id,
+        )
+
+        logger.info(
+            "MENSAJE ELIMINADO CORRECTAMENTE."
+        )
 
     except Exception as error:
 
-        logger.warning(
-            "No se pudo eliminar el mensaje ofensivo: %s",
+        logger.error(
+            "NO SE PUDO ELIMINAR EL MENSAJE: %s",
             error,
         )
 
         return
 
-    aviso = await context.bot.send_message(
-        chat_id=mensaje.chat_id,
-        text=(
-            "⚠️ Mensaje eliminado por contener "
-            "lenguaje no permitido."
-        ),
-    )
+    # Enviar aviso dentro del mismo tema
+    try:
 
-    programar_borrado(
-        context,
-        aviso.chat_id,
-        aviso.message_id,
-        TIEMPO_BORRADO_AVISO,
-    )
+        aviso = await context.bot.send_message(
+            chat_id=mensaje.chat_id,
+            message_thread_id=mensaje.message_thread_id,
+            text=(
+                "⚠️ Mensaje eliminado por contener "
+                "lenguaje no permitido."
+            ),
+        )
+
+        programar_borrado(
+            context,
+            aviso.chat_id,
+            aviso.message_id,
+            TIEMPO_BORRADO_AVISO,
+        )
+
+    except Exception as error:
+
+        logger.warning(
+            "No se pudo enviar aviso: %s",
+            error,
+        )
 
 
 # ============================================================
-# OBTENER SEMANAS CONFIGURADAS
+# SEMANAS CONFIGURADAS
 # ============================================================
 
-def obtener_semanas_configuradas(
-    clave_area: str,
-) -> dict[int, str]:
+def obtener_semanas_configuradas(clave_area):
 
     area = AREAS.get(clave_area)
 
     if not area:
         return {}
 
-    semanas_configuradas = {}
+    resultado = {}
 
-    for numero_semana, enlace in area["semanas"].items():
+    for numero, enlace in area["semanas"].items():
 
         enlace = enlace.strip()
-
-        if not enlace:
-            continue
 
         if enlace.startswith("PEGA_AQUI_LINK_"):
             continue
 
-        if not enlace.startswith(
-            ("https://", "http://")
+        if enlace.startswith(
+            ("http://", "https://")
         ):
-            continue
+            resultado[numero] = enlace
 
-        semanas_configuradas[
-            numero_semana
-        ] = enlace
-
-    return semanas_configuradas
+    return resultado
 
 
 # ============================================================
-# MENÚ DE ÁREAS
+# MENÚ ÁREAS
 # ============================================================
 
-def crear_menu_areas() -> InlineKeyboardMarkup:
+def crear_menu_areas():
 
     botones = []
 
-    for clave_area, datos_area in AREAS.items():
+    for clave, area in AREAS.items():
 
         botones.append(
             [
                 InlineKeyboardButton(
                     text=(
-                        f"{datos_area['icono']} "
-                        f"{datos_area['nombre']}"
+                        f"{area['icono']} "
+                        f"{area['nombre']}"
                     ),
-                    callback_data=f"area:{clave_area}",
+                    callback_data=f"area:{clave}",
                 )
             ]
         )
@@ -421,13 +439,13 @@ def crear_menu_areas() -> InlineKeyboardMarkup:
 
 
 # ============================================================
-# MENÚ DE SEMANAS
+# MENÚ SEMANAS
 # ============================================================
 
 def crear_menu_semanas(
-    clave_area: str,
-    pagina: int = 0,
-) -> InlineKeyboardMarkup:
+    clave_area,
+    pagina=0,
+):
 
     semanas_configuradas = (
         obtener_semanas_configuradas(
@@ -447,7 +465,7 @@ def crear_menu_semanas(
         botones.append(
             [
                 InlineKeyboardButton(
-                    text="⚠️ No hay semanas configuradas",
+                    "⚠️ No hay semanas configuradas",
                     callback_data="sin_semanas",
                 )
             ]
@@ -456,7 +474,7 @@ def crear_menu_semanas(
         botones.append(
             [
                 InlineKeyboardButton(
-                    text="⬅ Volver a las áreas",
+                    "⬅ Volver a las áreas",
                     callback_data="volver_areas",
                 )
             ]
@@ -465,7 +483,8 @@ def crear_menu_semanas(
         return InlineKeyboardMarkup(botones)
 
     total_paginas = ceil(
-        len(semanas) / SEMANAS_POR_PAGINA
+        len(semanas)
+        / SEMANAS_POR_PAGINA
     )
 
     pagina = max(
@@ -486,17 +505,13 @@ def crear_menu_semanas(
         + SEMANAS_POR_PAGINA
     )
 
-    semanas_visibles = semanas[
-        inicio:fin
-    ]
-
-    for numero_semana in semanas_visibles:
+    for numero in semanas[inicio:fin]:
 
         botones.append(
             [
                 InlineKeyboardButton(
-                    text=f"📁 SEMANA {numero_semana:02d}",
-                    url=semanas_configuradas[numero_semana],
+                    text=f"📁 SEMANA {numero:02d}",
+                    url=semanas_configuradas[numero],
                 )
             ]
         )
@@ -507,7 +522,7 @@ def crear_menu_semanas(
 
         navegacion.append(
             InlineKeyboardButton(
-                text="◀ Anterior",
+                "◀ Anterior",
                 callback_data=(
                     f"semanas:"
                     f"{clave_area}:"
@@ -518,10 +533,7 @@ def crear_menu_semanas(
 
     navegacion.append(
         InlineKeyboardButton(
-            text=(
-                f"{pagina + 1} "
-                f"de {total_paginas}"
-            ),
+            f"{pagina + 1} de {total_paginas}",
             callback_data="pagina_actual",
         )
     )
@@ -530,7 +542,7 @@ def crear_menu_semanas(
 
         navegacion.append(
             InlineKeyboardButton(
-                text="Siguiente ▶",
+                "Siguiente ▶",
                 callback_data=(
                     f"semanas:"
                     f"{clave_area}:"
@@ -544,7 +556,7 @@ def crear_menu_semanas(
     botones.append(
         [
             InlineKeyboardButton(
-                text="⬅ Volver a las áreas",
+                "⬅ Volver a las áreas",
                 callback_data="volver_areas",
             )
         ]
@@ -554,70 +566,66 @@ def crear_menu_semanas(
 
 
 # ============================================================
-# COMANDO /START
+# /START
 # ============================================================
 
 async def iniciar(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
+    update,
+    context,
+):
 
     if update.message is None:
         return
 
-    # Borrar /start escrito por el usuario
     programar_borrado(
         context,
         update.message.chat_id,
         update.message.message_id,
     )
 
-    mensaje_bot = await update.message.reply_text(
+    respuesta = await update.message.reply_text(
         "🤖 *Bot de Planeación activo*\n\n"
-        "Utiliza el comando /areas para consultar "
-        "las carpetas de Órdenes de Trabajo Semanales.",
+        "Utiliza /areas para consultar las carpetas "
+        "de Órdenes de Trabajo Semanales.",
         parse_mode="Markdown",
     )
 
-    # Borrar respuesta del bot
     programar_borrado(
         context,
-        mensaje_bot.chat_id,
-        mensaje_bot.message_id,
+        respuesta.chat_id,
+        respuesta.message_id,
     )
 
 
 # ============================================================
-# COMANDO /AREAS
+# /AREAS
 # ============================================================
 
 async def mostrar_areas(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
+    update,
+    context,
+):
 
     if update.message is None:
         return
 
-    # Borrar el /areas escrito por cualquier usuario
     programar_borrado(
         context,
         update.message.chat_id,
         update.message.message_id,
     )
 
-    mensaje_bot = await update.message.reply_text(
+    respuesta = await update.message.reply_text(
         "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\n"
         "Selecciona el área:",
         reply_markup=crear_menu_areas(),
         parse_mode="Markdown",
     )
 
-    # Borrar el menú del bot después de 1 minuto
     programar_borrado(
         context,
-        mensaje_bot.chat_id,
-        mensaje_bot.message_id,
+        respuesta.chat_id,
+        respuesta.message_id,
     )
 
 
@@ -626,26 +634,23 @@ async def mostrar_areas(
 # ============================================================
 
 async def seleccionar_area(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
+    update,
+    context,
+):
 
     consulta = update.callback_query
 
-    if consulta is None:
+    if not consulta:
         return
 
     await consulta.answer()
 
-    datos = consulta.data or ""
-
     try:
-        clave_area = datos.split(":")[1]
-
+        clave = consulta.data.split(":")[1]
     except IndexError:
         return
 
-    area = AREAS.get(clave_area)
+    area = AREAS.get(clave)
 
     if not area:
         return
@@ -658,7 +663,7 @@ async def seleccionar_area(
             "en la que deseas trabajar:"
         ),
         reply_markup=crear_menu_semanas(
-            clave_area,
+            clave,
             0,
         ),
         parse_mode="Markdown",
@@ -670,29 +675,27 @@ async def seleccionar_area(
 # ============================================================
 
 async def cambiar_pagina(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
+    update,
+    context,
+):
 
     consulta = update.callback_query
 
-    if consulta is None:
+    if not consulta:
         return
 
     datos = consulta.data or ""
 
     if datos == "pagina_actual":
 
-        await consulta.answer(
-            "Indicador de página."
-        )
+        await consulta.answer()
 
         return
 
     if datos == "sin_semanas":
 
         await consulta.answer(
-            "Todavía no hay semanas configuradas para esta área.",
+            "No hay semanas configuradas.",
             show_alert=True,
         )
 
@@ -702,80 +705,75 @@ async def cambiar_pagina(
 
     try:
 
-        _, clave_area, pagina_texto = (
-            datos.split(":")
-        )
+        _, clave, pagina = datos.split(":")
 
-        pagina = int(
-            pagina_texto
-        )
+        pagina = int(pagina)
 
     except (ValueError, IndexError):
+
         return
 
     await consulta.edit_message_reply_markup(
         reply_markup=crear_menu_semanas(
-            clave_area,
+            clave,
             pagina,
         )
     )
 
 
 # ============================================================
-# VOLVER A ÁREAS
+# VOLVER ÁREAS
 # ============================================================
 
 async def volver_areas(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
+    update,
+    context,
+):
 
     consulta = update.callback_query
 
-    if consulta is None:
+    if not consulta:
         return
 
     await consulta.answer()
 
     await consulta.edit_message_text(
-        text=(
-            "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\n"
-            "Selecciona el área:"
-        ),
+        "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\n"
+        "Selecciona el área:",
         reply_markup=crear_menu_areas(),
         parse_mode="Markdown",
     )
 
 
 # ============================================================
-# MANEJO DE ERRORES
+# ERRORES
 # ============================================================
 
 async def manejar_error(
-    update: object,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
+    update,
+    context,
+):
 
     logger.error(
-        "Ocurrió un error en el bot:",
+        "Error del bot:",
         exc_info=context.error,
     )
 
 
 # ============================================================
-# INICIAR BOT EN RENDER
+# INICIO RENDER
 # ============================================================
 
-def main() -> None:
+def main():
 
     if not TOKEN:
         raise ValueError(
-            "No se encontró la variable TELEGRAM_BOT_TOKEN."
+            "Falta TELEGRAM_BOT_TOKEN."
         )
 
     if not URL_RENDER:
         raise ValueError(
-            "No se encontró la variable RENDER_EXTERNAL_URL."
+            "Falta RENDER_EXTERNAL_URL."
         )
 
     aplicacion = (
@@ -784,10 +782,7 @@ def main() -> None:
         .build()
     )
 
-    # ========================================================
-    # COMANDOS
-    # ========================================================
-
+    # Comandos
     aplicacion.add_handler(
         CommandHandler(
             "start",
@@ -802,10 +797,7 @@ def main() -> None:
         )
     )
 
-    # ========================================================
-    # BOTONES
-    # ========================================================
-
+    # Botones
     aplicacion.add_handler(
         CallbackQueryHandler(
             seleccionar_area,
@@ -816,11 +808,7 @@ def main() -> None:
     aplicacion.add_handler(
         CallbackQueryHandler(
             cambiar_pagina,
-            pattern=(
-                r"^(semanas:|"
-                r"pagina_actual|"
-                r"sin_semanas)"
-            ),
+            pattern=r"^(semanas:|pagina_actual|sin_semanas)",
         )
     )
 
@@ -832,45 +820,37 @@ def main() -> None:
     )
 
     # ========================================================
-    # MODERACIÓN AUTOMÁTICA
+    # MODERACIÓN
+    # Escucha TODOS los mensajes que no hayan sido procesados
+    # por los handlers anteriores.
     # ========================================================
 
     aplicacion.add_handler(
         MessageHandler(
-            (
-                filters.TEXT
-                | filters.CaptionRegex(r".+")
-            )
-            & ~filters.COMMAND,
+            filters.ALL,
             moderar_mensaje,
         )
     )
-
-    # ========================================================
-    # ERRORES
-    # ========================================================
 
     aplicacion.add_error_handler(
         manejar_error
     )
 
-    # ========================================================
-    # WEBHOOK RENDER
-    # ========================================================
-
-    ruta_webhook = "telegram"
+    ruta = "telegram"
 
     url_webhook = (
-        f"{URL_RENDER}/{ruta_webhook}"
+        f"{URL_RENDER}/{ruta}"
     )
 
-    print("Bot de Planeación activo.")
-    print(f"Webhook activo: {url_webhook}")
+    print("Bot activo.")
+    print(
+        f"Webhook: {url_webhook}"
+    )
 
     aplicacion.run_webhook(
         listen="0.0.0.0",
         port=PUERTO,
-        url_path=ruta_webhook,
+        url_path=ruta,
         webhook_url=url_webhook,
         allowed_updates=Update.ALL_TYPES,
         drop_pending_updates=True,
