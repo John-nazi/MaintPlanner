@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 from math import ceil
 
 from telegram import (
@@ -30,6 +31,9 @@ PUERTO = int(os.getenv("PORT", "10000"))
 URL_RENDER = os.getenv("RENDER_EXTERNAL_URL")
 
 SEMANAS_POR_PAGINA = 6
+
+# Tiempo antes de borrar los mensajes del bot
+TIEMPO_BORRADO = 60
 
 
 # ============================================================
@@ -158,6 +162,47 @@ AREAS = {
 
 
 # ============================================================
+# BORRAR MENSAJE AUTOMÁTICAMENTE
+# ============================================================
+
+async def borrar_mensaje_despues(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+    message_id: int,
+) -> None:
+
+    await asyncio.sleep(TIEMPO_BORRADO)
+
+    try:
+        await context.bot.delete_message(
+            chat_id=chat_id,
+            message_id=message_id,
+        )
+
+    except Exception as error:
+        logger.warning(
+            "No se pudo borrar el mensaje %s: %s",
+            message_id,
+            error,
+        )
+
+
+def programar_borrado(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+    message_id: int,
+) -> None:
+
+    context.application.create_task(
+        borrar_mensaje_despues(
+            context,
+            chat_id,
+            message_id,
+        )
+    )
+
+
+# ============================================================
 # OBTENER SEMANAS CONFIGURADAS
 # ============================================================
 
@@ -219,11 +264,6 @@ def crear_menu_semanas(
     pagina: int = 0,
 ) -> InlineKeyboardMarkup:
 
-    area = AREAS.get(clave_area)
-
-    if not area:
-        return crear_menu_areas()
-
     semanas_configuradas = obtener_semanas_configuradas(
         clave_area
     )
@@ -233,7 +273,6 @@ def crear_menu_semanas(
         reverse=True,
     )
 
-    # YA NO SE MUESTRA EL BOTÓN DE CARPETA PRINCIPAL
     botones = []
 
     if not semanas:
@@ -336,11 +375,17 @@ async def iniciar(
     if update.message is None:
         return
 
-    await update.message.reply_text(
+    mensaje = await update.message.reply_text(
         "🤖 *Bot de Planeación activo*\n\n"
-        "Utiliza el comando /Areas para consultar las "
+        "Utiliza el comando /areas para consultar las "
         "carpetas de Órdenes de Trabajo Semanales.",
         parse_mode="Markdown",
+    )
+
+    programar_borrado(
+        context,
+        mensaje.chat_id,
+        mensaje.message_id,
     )
 
 
@@ -356,11 +401,17 @@ async def mostrar_areas(
     if update.message is None:
         return
 
-    await update.message.reply_text(
+    mensaje = await update.message.reply_text(
         "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\n"
         "Selecciona el área:",
         reply_markup=crear_menu_areas(),
         parse_mode="Markdown",
+    )
+
+    programar_borrado(
+        context,
+        mensaje.chat_id,
+        mensaje.message_id,
     )
 
 
