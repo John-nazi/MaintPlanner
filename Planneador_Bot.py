@@ -254,14 +254,7 @@ def crear_menu_semanas(
         reverse=True,
     )
 
-    botones = [
-        [
-            InlineKeyboardButton(
-                text="📂 Abrir carpeta principal del área",
-                url=area["carpeta_principal"],
-            )
-        ]
-    ]
+
 
     if not semanas:
 
