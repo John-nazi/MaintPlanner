@@ -40,7 +40,7 @@ SEMANAS_POR_PAGINA = 6
 TIEMPO_BORRADO = 60
 
 # Aviso de moderación
-TIEMPO_BORRADO_AVISO = 15
+TIEMPO_BORRADO_AVISO = 5
 
 
 # ============================================================
