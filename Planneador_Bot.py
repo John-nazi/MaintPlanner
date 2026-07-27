@@ -66,10 +66,7 @@ PALABRAS_PROHIBIDAS = [
     "pinche",
     "joto",
     "gay",
-    "culo"
-
-    # Agrega más aquí:
-    # "palabra",
+    "culo",
 ]
 
 
@@ -202,6 +199,47 @@ AREAS = {
 
 
 # ============================================================
+# VALIDAR QUE EL COMANDO SEA PARA NUESTRO BOT
+# ============================================================
+
+async def comando_es_para_este_bot(update, context, comando):
+
+    mensaje = update.effective_message
+
+    if mensaje is None or not mensaje.text:
+        return False
+
+    primera_parte = mensaje.text.split()[0].lower()
+
+    comando_base = f"/{comando.lower()}"
+
+    # Ejemplo:
+    # /start
+    if primera_parte == comando_base:
+        return True
+
+    # Ejemplo:
+    # /start@NombreBot
+    if primera_parte.startswith(comando_base + "@"):
+
+        destinatario = primera_parte.split("@", 1)[1]
+
+        try:
+            datos_bot = await context.bot.get_me()
+            nuestro_usuario = (datos_bot.username or "").lower()
+        except Exception as error:
+            logger.warning(
+                "No se pudo obtener el username del bot: %s",
+                error,
+            )
+            return False
+
+        return destinatario == nuestro_usuario
+
+    return False
+
+
+# ============================================================
 # BORRAR MENSAJES
 # ============================================================
 
@@ -303,9 +341,6 @@ async def moderar_mensaje(
     context: ContextTypes.DEFAULT_TYPE,
 ):
 
-    # IMPORTANTE:
-    # effective_message permite trabajar también con mensajes
-    # de temas, supergrupos y otras variantes de Telegram.
     mensaje = update.effective_message
 
     if mensaje is None:
@@ -317,7 +352,6 @@ async def moderar_mensaje(
         or ""
     )
 
-    # Registro temporal para diagnóstico en Render
     logger.info(
         "MENSAJE RECIBIDO | chat=%s | tipo=%s | tema=%s | texto=%r",
         mensaje.chat_id,
@@ -329,7 +363,7 @@ async def moderar_mensaje(
     if not texto:
         return
 
-    # No procesar comandos aquí
+    # Los comandos no pasan por moderación
     if texto.startswith("/"):
         return
 
@@ -361,7 +395,6 @@ async def moderar_mensaje(
 
         return
 
-    # Enviar aviso dentro del mismo tema
     try:
 
         aviso = await context.bot.send_message(
@@ -498,15 +531,8 @@ def crear_menu_semanas(
         ),
     )
 
-    inicio = (
-        pagina
-        * SEMANAS_POR_PAGINA
-    )
-
-    fin = (
-        inicio
-        + SEMANAS_POR_PAGINA
-    )
+    inicio = pagina * SEMANAS_POR_PAGINA
+    fin = inicio + SEMANAS_POR_PAGINA
 
     for numero in semanas[inicio:fin]:
 
@@ -577,16 +603,26 @@ async def iniciar(
     context,
 ):
 
-    if update.message is None:
+    # Ignora /start dirigido a OTRO bot
+    if not await comando_es_para_este_bot(
+        update,
+        context,
+        "start",
+    ):
+        return
+
+    mensaje = update.effective_message
+
+    if mensaje is None:
         return
 
     programar_borrado(
         context,
-        update.message.chat_id,
-        update.message.message_id,
+        mensaje.chat_id,
+        mensaje.message_id,
     )
 
-    respuesta = await update.message.reply_text(
+    respuesta = await mensaje.reply_text(
         "🤖 *Bot de Planeación activo*\n\n"
         "Utiliza /areas para consultar las carpetas "
         "de Órdenes de Trabajo Semanales.",
@@ -609,16 +645,26 @@ async def mostrar_areas(
     context,
 ):
 
-    if update.message is None:
+    # Ignora /areas dirigido a OTRO bot
+    if not await comando_es_para_este_bot(
+        update,
+        context,
+        "areas",
+    ):
+        return
+
+    mensaje = update.effective_message
+
+    if mensaje is None:
         return
 
     programar_borrado(
         context,
-        update.message.chat_id,
-        update.message.message_id,
+        mensaje.chat_id,
+        mensaje.message_id,
     )
 
-    respuesta = await update.message.reply_text(
+    respuesta = await mensaje.reply_text(
         "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\n"
         "Selecciona el área:",
         reply_markup=crear_menu_areas(),
@@ -692,7 +738,6 @@ async def cambiar_pagina(
     if datos == "pagina_actual":
 
         await consulta.answer()
-
         return
 
     if datos == "sin_semanas":
@@ -701,7 +746,6 @@ async def cambiar_pagina(
             "No hay semanas configuradas.",
             show_alert=True,
         )
-
         return
 
     await consulta.answer()
@@ -709,11 +753,9 @@ async def cambiar_pagina(
     try:
 
         _, clave, pagina = datos.split(":")
-
         pagina = int(pagina)
 
     except (ValueError, IndexError):
-
         return
 
     await consulta.edit_message_reply_markup(
@@ -822,12 +864,7 @@ def main():
         )
     )
 
-    # ========================================================
-    # MODERACIÓN
-    # Escucha TODOS los mensajes que no hayan sido procesados
-    # por los handlers anteriores.
-    # ========================================================
-
+    # Moderación
     aplicacion.add_handler(
         MessageHandler(
             filters.ALL,
@@ -840,15 +877,10 @@ def main():
     )
 
     ruta = "telegram"
-
-    url_webhook = (
-        f"{URL_RENDER}/{ruta}"
-    )
+    url_webhook = f"{URL_RENDER}/{ruta}"
 
     print("Bot activo.")
-    print(
-        f"Webhook: {url_webhook}"
-    )
+    print(f"Webhook: {url_webhook}")
 
     aplicacion.run_webhook(
         listen="0.0.0.0",
