@@ -213,25 +213,30 @@ async def comando_es_para_este_bot(update, context, comando):
 
     comando_base = f"/{comando.lower()}"
 
-    # Ejemplo:
     # /start
     if primera_parte == comando_base:
         return True
 
-    # Ejemplo:
     # /start@NombreBot
     if primera_parte.startswith(comando_base + "@"):
 
         destinatario = primera_parte.split("@", 1)[1]
 
         try:
+
             datos_bot = await context.bot.get_me()
-            nuestro_usuario = (datos_bot.username or "").lower()
+
+            nuestro_usuario = (
+                datos_bot.username or ""
+            ).lower()
+
         except Exception as error:
+
             logger.warning(
                 "No se pudo obtener el username del bot: %s",
                 error,
             )
+
             return False
 
         return destinatario == nuestro_usuario
@@ -253,12 +258,14 @@ async def borrar_mensaje_despues(
     await asyncio.sleep(segundos)
 
     try:
+
         await context.bot.delete_message(
             chat_id=chat_id,
             message_id=message_id,
         )
 
     except Exception as error:
+
         logger.warning(
             "No se pudo borrar mensaje %s: %s",
             message_id,
@@ -333,7 +340,7 @@ def contiene_palabra_prohibida(texto):
 
 
 # ============================================================
-# MODERACIÓN
+# MODERACIÓN + DIAGNÓSTICO ONLYOFFICE
 # ============================================================
 
 async def moderar_mensaje(
@@ -352,6 +359,10 @@ async def moderar_mensaje(
         or ""
     )
 
+    # ========================================================
+    # DIAGNÓSTICO GENERAL
+    # ========================================================
+
     logger.info(
         "MENSAJE RECIBIDO | chat=%s | tipo=%s | tema=%s | texto=%r",
         mensaje.chat_id,
@@ -360,10 +371,56 @@ async def moderar_mensaje(
         texto,
     )
 
+    # ========================================================
+    # DIAGNÓSTICO DETALLADO
+    # Nos permitirá identificar exactamente los mensajes y
+    # archivos enviados por ONLYOFFICE.
+    # ========================================================
+
+    remitente = mensaje.from_user
+    documento = mensaje.document
+
+    logger.info(
+        "DETALLE MENSAJE | sender_id=%s | username=%s | es_bot=%s | "
+        "message_id=%s | tema=%s | archivo=%s | file_id=%s",
+        remitente.id if remitente else None,
+        remitente.username if remitente else None,
+        remitente.is_bot if remitente else None,
+        mensaje.message_id,
+        mensaje.message_thread_id,
+        documento.file_name if documento else None,
+        documento.file_id if documento else None,
+    )
+
+    # ========================================================
+    # DETECTAR ESPECÍFICAMENTE ONLYOFFICE
+    # Por ahora solo lo registra. NO borra nada.
+    # ========================================================
+
+    if (
+        remitente
+        and remitente.is_bot
+        and (remitente.username or "").lower() == "onlyoffice_bot"
+    ):
+
+        logger.info(
+            "ONLYOFFICE DETECTADO | message_id=%s | tema=%s | "
+            "archivo=%s | file_id=%s | texto=%r",
+            mensaje.message_id,
+            mensaje.message_thread_id,
+            documento.file_name if documento else None,
+            documento.file_id if documento else None,
+            texto,
+        )
+
+    # ========================================================
+    # MODERACIÓN
+    # ========================================================
+
     if not texto:
         return
 
-    # Los comandos no pasan por moderación
+    # No procesar comandos
     if texto.startswith("/"):
         return
 
@@ -603,7 +660,7 @@ async def iniciar(
     context,
 ):
 
-    # Ignora /start dirigido a OTRO bot
+    # Ignorar /start dirigido a otro bot
     if not await comando_es_para_este_bot(
         update,
         context,
@@ -645,7 +702,7 @@ async def mostrar_areas(
     context,
 ):
 
-    # Ignora /areas dirigido a OTRO bot
+    # Ignorar /areas dirigido a otro bot
     if not await comando_es_para_este_bot(
         update,
         context,
@@ -695,8 +752,11 @@ async def seleccionar_area(
     await consulta.answer()
 
     try:
+
         clave = consulta.data.split(":")[1]
+
     except IndexError:
+
         return
 
     area = AREAS.get(clave)
@@ -746,6 +806,7 @@ async def cambiar_pagina(
             "No hay semanas configuradas.",
             show_alert=True,
         )
+
         return
 
     await consulta.answer()
@@ -753,9 +814,11 @@ async def cambiar_pagina(
     try:
 
         _, clave, pagina = datos.split(":")
+
         pagina = int(pagina)
 
     except (ValueError, IndexError):
+
         return
 
     await consulta.edit_message_reply_markup(
@@ -812,11 +875,13 @@ async def manejar_error(
 def main():
 
     if not TOKEN:
+
         raise ValueError(
             "Falta TELEGRAM_BOT_TOKEN."
         )
 
     if not URL_RENDER:
+
         raise ValueError(
             "Falta RENDER_EXTERNAL_URL."
         )
@@ -827,7 +892,10 @@ def main():
         .build()
     )
 
-    # Comandos
+    # ========================================================
+    # COMANDOS
+    # ========================================================
+
     aplicacion.add_handler(
         CommandHandler(
             "start",
@@ -842,7 +910,10 @@ def main():
         )
     )
 
-    # Botones
+    # ========================================================
+    # BOTONES
+    # ========================================================
+
     aplicacion.add_handler(
         CallbackQueryHandler(
             seleccionar_area,
@@ -864,7 +935,18 @@ def main():
         )
     )
 
-    # Moderación
+    # ========================================================
+    # MENSAJES
+    #
+    # Escucha:
+    # - mensajes normales
+    # - PDFs
+    # - mensajes de ONLYOFFICE
+    # - mensajes dentro de temas
+    #
+    # Además mantiene la moderación.
+    # ========================================================
+
     aplicacion.add_handler(
         MessageHandler(
             filters.ALL,
@@ -872,15 +954,28 @@ def main():
         )
     )
 
+    # ========================================================
+    # ERRORES
+    # ========================================================
+
     aplicacion.add_error_handler(
         manejar_error
     )
 
+    # ========================================================
+    # WEBHOOK RENDER
+    # ========================================================
+
     ruta = "telegram"
-    url_webhook = f"{URL_RENDER}/{ruta}"
+
+    url_webhook = (
+        f"{URL_RENDER}/{ruta}"
+    )
 
     print("Bot activo.")
-    print(f"Webhook: {url_webhook}")
+    print(
+        f"Webhook: {url_webhook}"
+    )
 
     aplicacion.run_webhook(
         listen="0.0.0.0",
