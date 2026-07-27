@@ -35,27 +35,13 @@ PUERTO = int(os.getenv("PORT", "10000"))
 URL_RENDER = os.getenv("RENDER_EXTERNAL_URL")
 
 SEMANAS_POR_PAGINA = 6
-
-# Borrado de comandos y respuestas temporales
 TIEMPO_BORRADO = 60
-
-# Aviso de moderación
 TIEMPO_BORRADO_AVISO = 5
 
-# Usuario oficial de ONLYOFFICE
 ONLYOFFICE_USERNAME = "onlyoffice_bot"
 
-
 # ============================================================
-# PDFs PENDIENTES DE EDICIÓN
-#
-# Aquí NO se guarda el PDF.
-# Solo:
-# - chat
-# - tema
-# - ID de OT
-# - nombre
-# - message_id
+# REGISTRO TEMPORAL DE PDFs
 # ============================================================
 
 PDF_PENDIENTES = []
@@ -115,14 +101,12 @@ AREAS = {
 
 
 # ============================================================
-# EXTRAER ID ÚNICO DE OT
+# EXTRAER ID DE OT
 #
 # Ejemplo:
-#
 # 24797437_Reemplazo_Baleros.pdf
 #
 # Devuelve:
-#
 # 24797437
 # ============================================================
 
@@ -145,7 +129,7 @@ def extraer_id_ot(nombre_archivo):
 
 
 # ============================================================
-# VALIDAR QUE EL COMANDO SEA PARA NUESTRO BOT
+# VALIDAR COMANDOS PARA NUESTRO BOT
 # ============================================================
 
 async def comando_es_para_este_bot(
@@ -159,21 +143,12 @@ async def comando_es_para_este_bot(
     if mensaje is None or not mensaje.text:
         return False
 
-    primera_parte = (
-        mensaje.text
-        .split()[0]
-        .lower()
-    )
-
+    primera_parte = mensaje.text.split()[0].lower()
     comando_base = f"/{comando.lower()}"
 
-    # Ejemplo:
-    # /start
     if primera_parte == comando_base:
         return True
 
-    # Ejemplo:
-    # /start@Planeador_IA_Bot
     if primera_parte.startswith(
         comando_base + "@"
     ):
@@ -188,7 +163,8 @@ async def comando_es_para_este_bot(
             datos_bot = await context.bot.get_me()
 
             nuestro_usuario = (
-                datos_bot.username or ""
+                datos_bot.username
+                or ""
             ).lower()
 
         except Exception as error:
@@ -206,7 +182,7 @@ async def comando_es_para_este_bot(
 
 
 # ============================================================
-# BORRAR MENSAJE DESPUÉS DE X SEGUNDOS
+# BORRADO PROGRAMADO
 # ============================================================
 
 async def borrar_mensaje_despues(
@@ -216,9 +192,7 @@ async def borrar_mensaje_despues(
     segundos,
 ):
 
-    await asyncio.sleep(
-        segundos
-    )
+    await asyncio.sleep(segundos)
 
     try:
 
@@ -279,9 +253,7 @@ def normalizar_texto(texto):
 
 def contiene_palabra_prohibida(texto):
 
-    texto = normalizar_texto(
-        texto
-    )
+    texto = normalizar_texto(texto)
 
     for palabra in PALABRAS_PROHIBIDAS:
 
@@ -325,25 +297,17 @@ def registrar_pdf_original(
         or ""
     )
 
-    if not nombre.lower().endswith(
-        ".pdf"
-    ):
+    if not nombre.lower().endswith(".pdf"):
         return
 
     id_ot = extraer_id_ot(
         nombre
     )
 
-    # Solo trabajamos con PDFs que tengan:
-    # NUMERO_
-    #
-    # Ejemplo:
-    # 24797437_archivo.pdf
     if not id_ot:
 
         logger.info(
-            "PDF IGNORADO SIN ID DE OT | "
-            "archivo=%s",
+            "PDF IGNORADO SIN ID DE OT | archivo=%s",
             nombre,
         )
 
@@ -374,7 +338,7 @@ def registrar_pdf_original(
 
 
 # ============================================================
-# BUSCAR ORIGINAL POR ID DE OT
+# BUSCAR PDF ORIGINAL
 # ============================================================
 
 def buscar_pdf_original(
@@ -383,8 +347,6 @@ def buscar_pdf_original(
     id_ot,
 ):
 
-    # Buscar desde el más reciente
-    # hacia el más antiguo.
     for indice in range(
         len(PDF_PENDIENTES) - 1,
         -1,
@@ -395,37 +357,22 @@ def buscar_pdf_original(
             PDF_PENDIENTES[indice]
         )
 
-        if (
-            registro["chat_id"]
-            != chat_id
-        ):
+        if registro["chat_id"] != chat_id:
             continue
 
-        if (
-            registro["tema"]
-            != tema
-        ):
+        if registro["tema"] != tema:
             continue
 
-        if (
-            registro["id_ot"]
-            != id_ot
-        ):
+        if registro["id_ot"] != id_ot:
             continue
 
-        return (
-            indice,
-            registro,
-        )
+        return indice, registro
 
-    return (
-        None,
-        None,
-    )
+    return None, None
 
 
 # ============================================================
-# PROCESAR MENSAJE DE ONLYOFFICE
+# PROCESAR MENSAJES DE ONLYOFFICE
 # ============================================================
 
 async def procesar_onlyoffice(
@@ -471,11 +418,7 @@ async def procesar_onlyoffice(
         texto,
     )
 
-    # --------------------------------------------------------
-    # Si no contiene documento todavía,
-    # puede ser "Send file" u otro mensaje.
-    # --------------------------------------------------------
-
+    # Mensajes tipo "Send file"
     if documento is None:
         return True
 
@@ -484,14 +427,8 @@ async def procesar_onlyoffice(
         or ""
     )
 
-    if not nombre_final.lower().endswith(
-        ".pdf"
-    ):
+    if not nombre_final.lower().endswith(".pdf"):
         return True
-
-    # --------------------------------------------------------
-    # Extraer ID único
-    # --------------------------------------------------------
 
     id_ot_final = extraer_id_ot(
         nombre_final
@@ -506,17 +443,6 @@ async def procesar_onlyoffice(
         )
 
         return True
-
-    # --------------------------------------------------------
-    # Confirmar que ONLYOFFICE está enviando
-    # la versión FINAL.
-    #
-    # Inglés:
-    # Your file is ready...
-    #
-    # Español:
-    # Su archivo está listo...
-    # --------------------------------------------------------
 
     texto_normalizado = normalizar_texto(
         texto
@@ -551,20 +477,10 @@ async def procesar_onlyoffice(
         mensaje.message_id,
     )
 
-    # --------------------------------------------------------
-    # Buscar el PDF original usando solamente:
-    #
-    # CHAT
-    # TEMA
-    # ID OT
-    # --------------------------------------------------------
-
-    indice, original = (
-        buscar_pdf_original(
-            mensaje.chat_id,
-            mensaje.message_thread_id,
-            id_ot_final,
-        )
+    indice, original = buscar_pdf_original(
+        mensaje.chat_id,
+        mensaje.message_thread_id,
+        id_ot_final,
     )
 
     if original is None:
@@ -590,7 +506,7 @@ async def procesar_onlyoffice(
     )
 
     # ========================================================
-    # ELIMINAR ÚNICAMENTE EL PDF ORIGINAL
+    # ELIMINAR PDF ORIGINAL
     # ========================================================
 
     try:
@@ -610,7 +526,6 @@ async def procesar_onlyoffice(
             original["nombre"],
         )
 
-        # Eliminar registro temporal
         PDF_PENDIENTES.pop(
             indice
         )
@@ -766,7 +681,6 @@ async def procesar_mensaje(
     if not texto:
         return
 
-    # No moderar comandos
     if texto.startswith("/"):
         return
 
@@ -865,15 +779,13 @@ def obtener_semanas_configuradas(
                 "https://",
             )
         ):
-            resultado[numero] = (
-                enlace
-            )
+            resultado[numero] = enlace
 
     return resultado
 
 
 # ============================================================
-# MENÚ DE ÁREAS
+# MENÚ ÁREAS
 # ============================================================
 
 def crear_menu_areas():
@@ -904,7 +816,7 @@ def crear_menu_areas():
 
 
 # ============================================================
-# MENÚ DE SEMANAS
+# MENÚ SEMANAS
 # ============================================================
 
 def crear_menu_semanas(
@@ -1254,7 +1166,7 @@ async def cambiar_pagina(
 
 
 # ============================================================
-# VOLVER A ÁREAS
+# VOLVER ÁREAS
 # ============================================================
 
 async def volver_areas(
@@ -1297,7 +1209,7 @@ async def manejar_error(
 
 
 # ============================================================
-# INICIO
+# INICIO RENDER
 # ============================================================
 
 def main():
@@ -1320,10 +1232,6 @@ def main():
         .build()
     )
 
-    # ========================================================
-    # COMANDOS
-    # ========================================================
-
     aplicacion.add_handler(
         CommandHandler(
             "start",
@@ -1337,10 +1245,6 @@ def main():
             mostrar_areas,
         )
     )
-
-    # ========================================================
-    # BOTONES
-    # ========================================================
 
     aplicacion.add_handler(
         CallbackQueryHandler(
@@ -1367,10 +1271,6 @@ def main():
         )
     )
 
-    # ========================================================
-    # TODOS LOS MENSAJES
-    # ========================================================
-
     aplicacion.add_handler(
         MessageHandler(
             filters.ALL,
@@ -1378,17 +1278,9 @@ def main():
         )
     )
 
-    # ========================================================
-    # ERRORES
-    # ========================================================
-
     aplicacion.add_error_handler(
         manejar_error
     )
-
-    # ========================================================
-    # WEBHOOK RENDER
-    # ========================================================
 
     ruta = "telegram"
 
@@ -1396,10 +1288,7 @@ def main():
         f"{URL_RENDER}/{ruta}"
     )
 
-    print(
-        "Bot activo."
-    )
-
+    print("Bot activo.")
     print(
         f"Webhook: {url_webhook}"
     )
