@@ -36,11 +36,22 @@ URL_RENDER = os.getenv("RENDER_EXTERNAL_URL")
 
 SEMANAS_POR_PAGINA = 6
 
-# Borrado de /areas, /start y mensajes del bot
 TIEMPO_BORRADO = 60
-
-# Aviso de moderación
 TIEMPO_BORRADO_AVISO = 5
+
+ONLYOFFICE_USERNAME = "onlyoffice_bot"
+
+
+# ============================================================
+# PDFs PENDIENTES DE EDICIÓN
+#
+# Se guardan temporalmente:
+# chat + tema + nombre + message_id
+#
+# No almacena el PDF.
+# ============================================================
+
+PDF_PENDIENTES = []
 
 
 # ============================================================
@@ -75,131 +86,28 @@ PALABRAS_PROHIBIDAS = [
 # ============================================================
 
 AREAS = {
-
     "pintura": {
         "nombre": "Pintura y Secuenciado",
         "icono": "🔴",
-
         "semanas": {
-            52: "PEGA_AQUI_LINK_PINTURA_SEMANA_52",
-            51: "PEGA_AQUI_LINK_PINTURA_SEMANA_51",
-            50: "PEGA_AQUI_LINK_PINTURA_SEMANA_50",
-            49: "PEGA_AQUI_LINK_PINTURA_SEMANA_49",
-            48: "PEGA_AQUI_LINK_PINTURA_SEMANA_48",
-            47: "PEGA_AQUI_LINK_PINTURA_SEMANA_47",
-            46: "PEGA_AQUI_LINK_PINTURA_SEMANA_46",
-            45: "PEGA_AQUI_LINK_PINTURA_SEMANA_45",
-            44: "PEGA_AQUI_LINK_PINTURA_SEMANA_44",
-            43: "PEGA_AQUI_LINK_PINTURA_SEMANA_43",
-            42: "PEGA_AQUI_LINK_PINTURA_SEMANA_42",
-            41: "PEGA_AQUI_LINK_PINTURA_SEMANA_41",
-            40: "PEGA_AQUI_LINK_PINTURA_SEMANA_40",
-            39: "PEGA_AQUI_LINK_PINTURA_SEMANA_39",
-            38: "PEGA_AQUI_LINK_PINTURA_SEMANA_38",
-            37: "PEGA_AQUI_LINK_PINTURA_SEMANA_37",
-            36: "PEGA_AQUI_LINK_PINTURA_SEMANA_36",
-            35: "PEGA_AQUI_LINK_PINTURA_SEMANA_35",
-            34: "PEGA_AQUI_LINK_PINTURA_SEMANA_34",
-            33: "PEGA_AQUI_LINK_PINTURA_SEMANA_33",
-            32: "PEGA_AQUI_LINK_PINTURA_SEMANA_32",
-            31: "PEGA_AQUI_LINK_PINTURA_SEMANA_31",
-            30: "PEGA_AQUI_LINK_PINTURA_SEMANA_30",
-            29: "PEGA_AQUI_LINK_PINTURA_SEMANA_29",
-            28: "PEGA_AQUI_LINK_PINTURA_SEMANA_28",
-            27: "PEGA_AQUI_LINK_PINTURA_SEMANA_27",
-            26: "PEGA_AQUI_LINK_PINTURA_SEMANA_26",
-            25: "PEGA_AQUI_LINK_PINTURA_SEMANA_25",
-            24: "PEGA_AQUI_LINK_PINTURA_SEMANA_24",
-            23: "PEGA_AQUI_LINK_PINTURA_SEMANA_23",
-            22: "PEGA_AQUI_LINK_PINTURA_SEMANA_22",
-            21: "PEGA_AQUI_LINK_PINTURA_SEMANA_21",
-            20: "PEGA_AQUI_LINK_PINTURA_SEMANA_20",
-            19: "PEGA_AQUI_LINK_PINTURA_SEMANA_19",
-            18: "PEGA_AQUI_LINK_PINTURA_SEMANA_18",
-            17: "PEGA_AQUI_LINK_PINTURA_SEMANA_17",
-            16: "PEGA_AQUI_LINK_PINTURA_SEMANA_16",
-            15: "PEGA_AQUI_LINK_PINTURA_SEMANA_15",
-            14: "PEGA_AQUI_LINK_PINTURA_SEMANA_14",
-            13: "PEGA_AQUI_LINK_PINTURA_SEMANA_13",
-            12: "PEGA_AQUI_LINK_PINTURA_SEMANA_12",
-            11: "PEGA_AQUI_LINK_PINTURA_SEMANA_11",
-            10: "PEGA_AQUI_LINK_PINTURA_SEMANA_10",
-            9: "PEGA_AQUI_LINK_PINTURA_SEMANA_09",
-            8: "PEGA_AQUI_LINK_PINTURA_SEMANA_08",
-            7: "PEGA_AQUI_LINK_PINTURA_SEMANA_07",
-            6: "PEGA_AQUI_LINK_PINTURA_SEMANA_06",
-            5: "PEGA_AQUI_LINK_PINTURA_SEMANA_05",
-            4: "PEGA_AQUI_LINK_PINTURA_SEMANA_04",
-            3: "PEGA_AQUI_LINK_PINTURA_SEMANA_03",
-            2: "PEGA_AQUI_LINK_PINTURA_SEMANA_02",
-            1: "PEGA_AQUI_LINK_PINTURA_SEMANA_01",
+            numero: f"PEGA_AQUI_LINK_PINTURA_SEMANA_{numero:02d}"
+            for numero in range(52, 0, -1)
         },
     },
 
     "eco_custom": {
         "nombre": "Eco-Custom",
         "icono": "🟢",
-
         "semanas": {
-            52: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_52",
-            51: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_51",
-            50: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_50",
-            49: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_49",
-            48: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_48",
-            47: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_47",
-            46: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_46",
-            45: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_45",
-            44: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_44",
-            43: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_43",
-            42: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_42",
-            41: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_41",
-            40: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_40",
-            39: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_39",
-            38: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_38",
-            37: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_37",
-            36: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_36",
-            35: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_35",
-            34: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_34",
-            33: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_33",
-            32: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_32",
-            31: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_31",
-            30: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_30",
-            29: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_29",
-            28: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_28",
-            27: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_27",
-            26: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_26",
-            25: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_25",
-            24: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_24",
-            23: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_23",
-            22: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_22",
-            21: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_21",
-            20: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_20",
-            19: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_19",
-            18: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_18",
-            17: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_17",
-            16: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_16",
-            15: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_15",
-            14: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_14",
-            13: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_13",
-            12: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_12",
-            11: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_11",
-            10: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_10",
-            9: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_09",
-            8: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_08",
-            7: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_07",
-            6: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_06",
-            5: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_05",
-            4: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_04",
-            3: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_03",
-            2: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_02",
-            1: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_01",
+            numero: f"PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_{numero:02d}"
+            for numero in range(52, 0, -1)
         },
     },
 }
 
 
 # ============================================================
-# VALIDAR QUE EL COMANDO SEA PARA NUESTRO BOT
+# VALIDAR COMANDOS
 # ============================================================
 
 async def comando_es_para_este_bot(update, context, comando):
@@ -210,33 +118,24 @@ async def comando_es_para_este_bot(update, context, comando):
         return False
 
     primera_parte = mensaje.text.split()[0].lower()
-
     comando_base = f"/{comando.lower()}"
 
-    # /start
     if primera_parte == comando_base:
         return True
 
-    # /start@NombreBot
     if primera_parte.startswith(comando_base + "@"):
 
         destinatario = primera_parte.split("@", 1)[1]
 
         try:
-
             datos_bot = await context.bot.get_me()
-
-            nuestro_usuario = (
-                datos_bot.username or ""
-            ).lower()
+            nuestro_usuario = (datos_bot.username or "").lower()
 
         except Exception as error:
-
             logger.warning(
                 "No se pudo obtener el username del bot: %s",
                 error,
             )
-
             return False
 
         return destinatario == nuestro_usuario
@@ -245,7 +144,7 @@ async def comando_es_para_este_bot(update, context, comando):
 
 
 # ============================================================
-# BORRAR MENSAJES
+# BORRADO PROGRAMADO
 # ============================================================
 
 async def borrar_mensaje_despues(
@@ -258,14 +157,12 @@ async def borrar_mensaje_despues(
     await asyncio.sleep(segundos)
 
     try:
-
         await context.bot.delete_message(
             chat_id=chat_id,
             message_id=message_id,
         )
 
     except Exception as error:
-
         logger.warning(
             "No se pudo borrar mensaje %s: %s",
             message_id,
@@ -311,7 +208,7 @@ def normalizar_texto(texto):
 
 
 # ============================================================
-# DETECTAR PALABRAS PROHIBIDAS
+# PALABRAS PROHIBIDAS
 # ============================================================
 
 def contiene_palabra_prohibida(texto):
@@ -340,10 +237,188 @@ def contiene_palabra_prohibida(texto):
 
 
 # ============================================================
-# MODERACIÓN + DIAGNÓSTICO ONLYOFFICE
+# REGISTRAR PDF ORIGINAL
 # ============================================================
 
-async def moderar_mensaje(
+def registrar_pdf_original(mensaje):
+
+    documento = mensaje.document
+
+    if documento is None:
+        return
+
+    nombre = documento.file_name or ""
+
+    if not nombre.lower().endswith(".pdf"):
+        return
+
+    registro = {
+        "chat_id": mensaje.chat_id,
+        "tema": mensaje.message_thread_id,
+        "message_id": mensaje.message_id,
+        "nombre": nombre,
+    }
+
+    PDF_PENDIENTES.append(registro)
+
+    logger.info(
+        "PDF ORIGINAL REGISTRADO | chat=%s | tema=%s | "
+        "message_id=%s | archivo=%s",
+        registro["chat_id"],
+        registro["tema"],
+        registro["message_id"],
+        registro["nombre"],
+    )
+
+
+# ============================================================
+# BUSCAR PDF ORIGINAL
+# ============================================================
+
+def buscar_pdf_original(
+    chat_id,
+    tema,
+    nombre_archivo,
+):
+
+    nombre_archivo = (
+        nombre_archivo or ""
+    ).lower()
+
+    # Buscar del más reciente al más antiguo
+    for indice in range(
+        len(PDF_PENDIENTES) - 1,
+        -1,
+        -1,
+    ):
+
+        registro = PDF_PENDIENTES[indice]
+
+        if registro["chat_id"] != chat_id:
+            continue
+
+        if registro["tema"] != tema:
+            continue
+
+        if registro["nombre"].lower() != nombre_archivo:
+            continue
+
+        return indice, registro
+
+    return None, None
+
+
+# ============================================================
+# PROCESAR PDF FINAL DE ONLYOFFICE
+# ============================================================
+
+async def procesar_onlyoffice(
+    mensaje,
+    context,
+):
+
+    remitente = mensaje.from_user
+
+    if remitente is None:
+        return False
+
+    username = (
+        remitente.username or ""
+    ).lower()
+
+    if not remitente.is_bot:
+        return False
+
+    if username != ONLYOFFICE_USERNAME:
+        return False
+
+    documento = mensaje.document
+
+    texto = (
+        mensaje.text
+        or mensaje.caption
+        or ""
+    )
+
+    logger.info(
+        "ONLYOFFICE DETECTADO | message_id=%s | tema=%s | "
+        "archivo=%s | texto=%r",
+        mensaje.message_id,
+        mensaje.message_thread_id,
+        documento.file_name if documento else None,
+        texto,
+    )
+
+    # No es todavía el PDF final
+    if documento is None:
+        return True
+
+    nombre_final = documento.file_name or ""
+
+    if not nombre_final.lower().endswith(".pdf"):
+        return True
+
+    # Confirmación que usa ONLYOFFICE al devolver la versión final
+    if (
+        "your file is ready" not in texto.lower()
+        and "final version" not in texto.lower()
+    ):
+        return True
+
+    indice, original = buscar_pdf_original(
+        mensaje.chat_id,
+        mensaje.message_thread_id,
+        nombre_final,
+    )
+
+    if original is None:
+
+        logger.warning(
+            "PDF FINAL RECIBIDO PERO NO SE ENCONTRÓ ORIGINAL | "
+            "archivo=%s | tema=%s",
+            nombre_final,
+            mensaje.message_thread_id,
+        )
+
+        return True
+
+    # ========================================================
+    # ELIMINAR PDF ORIGINAL
+    # ========================================================
+
+    try:
+
+        await context.bot.delete_message(
+            chat_id=original["chat_id"],
+            message_id=original["message_id"],
+        )
+
+        logger.info(
+            "PDF ORIGINAL ELIMINADO | message_id=%s | archivo=%s",
+            original["message_id"],
+            original["nombre"],
+        )
+
+        # Ya no necesitamos ese registro
+        PDF_PENDIENTES.pop(indice)
+
+    except Exception as error:
+
+        logger.error(
+            "NO SE PUDO ELIMINAR PDF ORIGINAL | "
+            "message_id=%s | error=%s",
+            original["message_id"],
+            error,
+        )
+
+    return True
+
+
+# ============================================================
+# MENSAJES + ONLYOFFICE + MODERACIÓN
+# ============================================================
+
+async def procesar_mensaje(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
@@ -359,8 +434,11 @@ async def moderar_mensaje(
         or ""
     )
 
+    remitente = mensaje.from_user
+    documento = mensaje.document
+
     # ========================================================
-    # DIAGNÓSTICO GENERAL
+    # LOG DETALLADO
     # ========================================================
 
     logger.info(
@@ -371,18 +449,10 @@ async def moderar_mensaje(
         texto,
     )
 
-    # ========================================================
-    # DIAGNÓSTICO DETALLADO
-    # Nos permitirá identificar exactamente los mensajes y
-    # archivos enviados por ONLYOFFICE.
-    # ========================================================
-
-    remitente = mensaje.from_user
-    documento = mensaje.document
-
     logger.info(
-        "DETALLE MENSAJE | sender_id=%s | username=%s | es_bot=%s | "
-        "message_id=%s | tema=%s | archivo=%s | file_id=%s",
+        "DETALLE MENSAJE | sender_id=%s | username=%s | "
+        "es_bot=%s | message_id=%s | tema=%s | "
+        "archivo=%s | file_id=%s",
         remitente.id if remitente else None,
         remitente.username if remitente else None,
         remitente.is_bot if remitente else None,
@@ -393,25 +463,38 @@ async def moderar_mensaje(
     )
 
     # ========================================================
-    # DETECTAR ESPECÍFICAMENTE ONLYOFFICE
-    # Por ahora solo lo registra. NO borra nada.
+    # MENSAJES DE ONLYOFFICE
     # ========================================================
 
     if (
         remitente
         and remitente.is_bot
-        and (remitente.username or "").lower() == "onlyoffice_bot"
+        and (remitente.username or "").lower()
+        == ONLYOFFICE_USERNAME
     ):
 
-        logger.info(
-            "ONLYOFFICE DETECTADO | message_id=%s | tema=%s | "
-            "archivo=%s | file_id=%s | texto=%r",
-            mensaje.message_id,
-            mensaje.message_thread_id,
-            documento.file_name if documento else None,
-            documento.file_id if documento else None,
-            texto,
+        await procesar_onlyoffice(
+            mensaje,
+            context,
         )
+
+        return
+
+    # ========================================================
+    # REGISTRAR PDFs NORMALES
+    #
+    # Puede ser un usuario normal o GroupAnonymousBot.
+    # ========================================================
+
+    if documento:
+
+        nombre = documento.file_name or ""
+
+        if nombre.lower().endswith(".pdf"):
+
+            registrar_pdf_original(
+                mensaje
+            )
 
     # ========================================================
     # MODERACIÓN
@@ -420,7 +503,6 @@ async def moderar_mensaje(
     if not texto:
         return
 
-    # No procesar comandos
     if texto.startswith("/"):
         return
 
@@ -495,7 +577,9 @@ def obtener_semanas_configuradas(clave_area):
 
         enlace = enlace.strip()
 
-        if enlace.startswith("PEGA_AQUI_LINK_"):
+        if enlace.startswith(
+            "PEGA_AQUI_LINK_"
+        ):
             continue
 
         if enlace.startswith(
@@ -528,7 +612,9 @@ def crear_menu_areas():
             ]
         )
 
-    return InlineKeyboardMarkup(botones)
+    return InlineKeyboardMarkup(
+        botones
+    )
 
 
 # ============================================================
@@ -573,7 +659,9 @@ def crear_menu_semanas(
             ]
         )
 
-        return InlineKeyboardMarkup(botones)
+        return InlineKeyboardMarkup(
+            botones
+        )
 
     total_paginas = ceil(
         len(semanas)
@@ -588,8 +676,15 @@ def crear_menu_semanas(
         ),
     )
 
-    inicio = pagina * SEMANAS_POR_PAGINA
-    fin = inicio + SEMANAS_POR_PAGINA
+    inicio = (
+        pagina
+        * SEMANAS_POR_PAGINA
+    )
+
+    fin = (
+        inicio
+        + SEMANAS_POR_PAGINA
+    )
 
     for numero in semanas[inicio:fin]:
 
@@ -637,7 +732,9 @@ def crear_menu_semanas(
             )
         )
 
-    botones.append(navegacion)
+    botones.append(
+        navegacion
+    )
 
     botones.append(
         [
@@ -648,7 +745,9 @@ def crear_menu_semanas(
         ]
     )
 
-    return InlineKeyboardMarkup(botones)
+    return InlineKeyboardMarkup(
+        botones
+    )
 
 
 # ============================================================
@@ -660,7 +759,6 @@ async def iniciar(
     context,
 ):
 
-    # Ignorar /start dirigido a otro bot
     if not await comando_es_para_este_bot(
         update,
         context,
@@ -702,7 +800,6 @@ async def mostrar_areas(
     context,
 ):
 
-    # Ignorar /areas dirigido a otro bot
     if not await comando_es_para_este_bot(
         update,
         context,
@@ -752,14 +849,14 @@ async def seleccionar_area(
     await consulta.answer()
 
     try:
-
         clave = consulta.data.split(":")[1]
 
     except IndexError:
-
         return
 
-    area = AREAS.get(clave)
+    area = AREAS.get(
+        clave
+    )
 
     if not area:
         return
@@ -813,12 +910,18 @@ async def cambiar_pagina(
 
     try:
 
-        _, clave, pagina = datos.split(":")
+        _, clave, pagina = (
+            datos.split(":")
+        )
 
-        pagina = int(pagina)
+        pagina = int(
+            pagina
+        )
 
-    except (ValueError, IndexError):
-
+    except (
+        ValueError,
+        IndexError,
+    ):
         return
 
     await consulta.edit_message_reply_markup(
@@ -875,13 +978,11 @@ async def manejar_error(
 def main():
 
     if not TOKEN:
-
         raise ValueError(
             "Falta TELEGRAM_BOT_TOKEN."
         )
 
     if not URL_RENDER:
-
         raise ValueError(
             "Falta RENDER_EXTERNAL_URL."
         )
@@ -924,7 +1025,11 @@ def main():
     aplicacion.add_handler(
         CallbackQueryHandler(
             cambiar_pagina,
-            pattern=r"^(semanas:|pagina_actual|sin_semanas)",
+            pattern=(
+                r"^(semanas:|"
+                r"pagina_actual|"
+                r"sin_semanas)"
+            ),
         )
     )
 
@@ -936,27 +1041,15 @@ def main():
     )
 
     # ========================================================
-    # MENSAJES
-    #
-    # Escucha:
-    # - mensajes normales
-    # - PDFs
-    # - mensajes de ONLYOFFICE
-    # - mensajes dentro de temas
-    #
-    # Además mantiene la moderación.
+    # TODOS LOS MENSAJES
     # ========================================================
 
     aplicacion.add_handler(
         MessageHandler(
             filters.ALL,
-            moderar_mensaje,
+            procesar_mensaje,
         )
     )
-
-    # ========================================================
-    # ERRORES
-    # ========================================================
 
     aplicacion.add_error_handler(
         manejar_error
