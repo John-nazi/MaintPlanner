@@ -1,8 +1,11 @@
 import asyncio
+import json
 import logging
 import os
 import re
+import tempfile
 import unicodedata
+from datetime import datetime, timezone
 from math import ceil
 
 from telegram import (
@@ -47,19 +50,196 @@ ONLYOFFICE_USERNAME = "onlyoffice_bot"
 
 
 # ============================================================
-# PDFs PENDIENTES DE EDICIÓN
+# ESTADO PERSISTENTE DE EDICIONES
 #
-# Aquí NO se guarda el PDF.
-# Solo:
-# - chat
-# - tema
-# - ID de OT
-# - nombre
-# - message_id
-# - mensajes temporales relacionados con la edición
+# En Render:
+# - Si existe /var/data, se utiliza automáticamente.
+# - También puedes definir BOT_DATA_DIR.
+#
+# Para conservar el estado incluso después de reinicios o
+# despliegues, monta un Persistent Disk de Render en /var/data.
 # ============================================================
 
+DIRECTORIO_DATOS = os.getenv("BOT_DATA_DIR")
+
+if not DIRECTORIO_DATOS:
+    DIRECTORIO_DATOS = (
+        "/var/data"
+        if os.path.isdir("/var/data")
+        else os.getcwd()
+    )
+
+os.makedirs(
+    DIRECTORIO_DATOS,
+    exist_ok=True,
+)
+
+ARCHIVO_ESTADO = os.path.join(
+    DIRECTORIO_DATOS,
+    "pdf_pendientes.json",
+)
+
 PDF_PENDIENTES = []
+
+
+def ahora_utc_iso():
+
+    return datetime.now(
+        timezone.utc
+    ).isoformat()
+
+
+def cargar_estado():
+
+    global PDF_PENDIENTES
+
+    if not os.path.exists(
+        ARCHIVO_ESTADO
+    ):
+        PDF_PENDIENTES = []
+        return
+
+    try:
+
+        with open(
+            ARCHIVO_ESTADO,
+            "r",
+            encoding="utf-8",
+        ) as archivo:
+
+            datos = json.load(
+                archivo
+            )
+
+        if not isinstance(
+            datos,
+            list,
+        ):
+            raise ValueError(
+                "El estado guardado no es una lista."
+            )
+
+        registros_validos = []
+
+        for registro in datos:
+
+            if not isinstance(
+                registro,
+                dict,
+            ):
+                continue
+
+            if not registro.get(
+                "id_ot"
+            ):
+                continue
+
+            registro.setdefault(
+                "message_ids_limpieza",
+                [],
+            )
+
+            registro.setdefault(
+                "creado_en",
+                ahora_utc_iso(),
+            )
+
+            registros_validos.append(
+                registro
+            )
+
+        PDF_PENDIENTES = (
+            registros_validos
+        )
+
+        logger.info(
+            "ESTADO CARGADO | registros=%s | archivo=%s",
+            len(PDF_PENDIENTES),
+            ARCHIVO_ESTADO,
+        )
+
+    except Exception as error:
+
+        logger.error(
+            "NO SE PUDO CARGAR EL ESTADO | "
+            "archivo=%s | error=%s",
+            ARCHIVO_ESTADO,
+            error,
+        )
+
+        PDF_PENDIENTES = []
+
+
+def guardar_estado():
+
+    directorio = os.path.dirname(
+        ARCHIVO_ESTADO
+    )
+
+    os.makedirs(
+        directorio,
+        exist_ok=True,
+    )
+
+    archivo_temporal = None
+
+    try:
+
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=directorio,
+            prefix="pdf_pendientes_",
+            suffix=".tmp",
+            delete=False,
+        ) as archivo:
+
+            json.dump(
+                PDF_PENDIENTES,
+                archivo,
+                ensure_ascii=False,
+                indent=2,
+            )
+
+            archivo.flush()
+            os.fsync(
+                archivo.fileno()
+            )
+
+            archivo_temporal = (
+                archivo.name
+            )
+
+        os.replace(
+            archivo_temporal,
+            ARCHIVO_ESTADO,
+        )
+
+    except Exception as error:
+
+        logger.error(
+            "NO SE PUDO GUARDAR EL ESTADO | "
+            "archivo=%s | error=%s",
+            ARCHIVO_ESTADO,
+            error,
+        )
+
+        if (
+            archivo_temporal
+            and os.path.exists(
+                archivo_temporal
+            )
+        ):
+
+            try:
+                os.remove(
+                    archivo_temporal
+                )
+            except OSError:
+                pass
+
+
+cargar_estado()
 
 
 # ============================================================
@@ -309,6 +489,31 @@ def contiene_palabra_prohibida(texto):
 
 
 # ============================================================
+# EXTRAER ID DE OT DESDE TEXTO GENERAL
+#
+# Detecta, por ejemplo:
+# 24940262_Ensayos_no_destructivos.pdf
+# ============================================================
+
+def extraer_id_ot_de_texto(
+    texto,
+):
+
+    if not texto:
+        return None
+
+    coincidencia = re.search(
+        r"(?<!\d)(\d{6,})_",
+        texto,
+    )
+
+    if not coincidencia:
+        return None
+
+    return coincidencia.group(1)
+
+
+# ============================================================
 # REGISTRAR PDF ORIGINAL
 # ============================================================
 
@@ -335,11 +540,6 @@ def registrar_pdf_original(
         nombre
     )
 
-    # Solo trabajamos con PDFs que tengan:
-    # NUMERO_
-    #
-    # Ejemplo:
-    # 24797437_archivo.pdf
     if not id_ot:
 
         logger.info(
@@ -350,22 +550,37 @@ def registrar_pdf_original(
 
         return
 
+    # Evitar duplicar el mismo mensaje si Telegram reenvía
+    # una actualización después de un reinicio.
+    for registro in PDF_PENDIENTES:
+
+        if (
+            registro.get("chat_id")
+            == mensaje.chat_id
+            and registro.get("message_id")
+            == mensaje.message_id
+        ):
+
+            return
+
     registro = {
         "chat_id": mensaje.chat_id,
         "tema": mensaje.message_thread_id,
         "message_id": mensaje.message_id,
         "nombre": nombre,
         "id_ot": id_ot,
-        # Aquí se guardan todos los mensajes temporales
-        # relacionados con la edición de esta OT.
         "message_ids_limpieza": [
             mensaje.message_id,
         ],
+        "creado_en": ahora_utc_iso(),
+        "actualizado_en": ahora_utc_iso(),
     }
 
     PDF_PENDIENTES.append(
         registro
     )
+
+    guardar_estado()
 
     logger.info(
         "PDF ORIGINAL REGISTRADO | "
@@ -389,8 +604,6 @@ def buscar_pdf_original(
     id_ot,
 ):
 
-    # Buscar desde el más reciente
-    # hacia el más antiguo.
     for indice in range(
         len(PDF_PENDIENTES) - 1,
         -1,
@@ -402,20 +615,20 @@ def buscar_pdf_original(
         )
 
         if (
-            registro["chat_id"]
+            registro.get("chat_id")
             != chat_id
         ):
             continue
 
         if (
-            registro["tema"]
+            registro.get("tema")
             != tema
         ):
             continue
 
         if (
-            registro["id_ot"]
-            != id_ot
+            str(registro.get("id_ot"))
+            != str(id_ot)
         ):
             continue
 
@@ -423,6 +636,63 @@ def buscar_pdf_original(
             indice,
             registro,
         )
+
+    return (
+        None,
+        None,
+    )
+
+
+# ============================================================
+# BUSCAR REGISTRO POR CUALQUIER MENSAJE RELACIONADO
+# ============================================================
+
+def buscar_por_message_id(
+    chat_id,
+    tema,
+    message_id,
+):
+
+    if message_id is None:
+        return None, None
+
+    for indice in range(
+        len(PDF_PENDIENTES) - 1,
+        -1,
+        -1,
+    ):
+
+        registro = (
+            PDF_PENDIENTES[indice]
+        )
+
+        if (
+            registro.get("chat_id")
+            != chat_id
+        ):
+            continue
+
+        if (
+            registro.get("tema")
+            != tema
+        ):
+            continue
+
+        mensajes = registro.get(
+            "message_ids_limpieza",
+            [],
+        )
+
+        if (
+            registro.get("message_id")
+            == message_id
+            or message_id in mensajes
+        ):
+
+            return (
+                indice,
+                registro,
+            )
 
     return (
         None,
@@ -445,17 +715,31 @@ def buscar_pdf_pendiente_reciente(
         -1,
     ):
 
-        registro = PDF_PENDIENTES[indice]
+        registro = (
+            PDF_PENDIENTES[indice]
+        )
 
-        if registro["chat_id"] != chat_id:
+        if (
+            registro.get("chat_id")
+            != chat_id
+        ):
             continue
 
-        if registro["tema"] != tema:
+        if (
+            registro.get("tema")
+            != tema
+        ):
             continue
 
-        return indice, registro
+        return (
+            indice,
+            registro,
+        )
 
-    return None, None
+    return (
+        None,
+        None,
+    )
 
 
 # ============================================================
@@ -467,22 +751,133 @@ def agregar_mensaje_a_limpieza(
     message_id,
 ):
 
-    if registro is None or message_id is None:
-        return
+    if (
+        registro is None
+        or message_id is None
+    ):
+        return False
 
     mensajes = registro.setdefault(
         "message_ids_limpieza",
         [],
     )
 
-    if message_id not in mensajes:
-        mensajes.append(message_id)
+    if message_id in mensajes:
+        return False
+
+    mensajes.append(
+        message_id
+    )
+
+    registro["actualizado_en"] = (
+        ahora_utc_iso()
+    )
+
+    guardar_estado()
+
+    return True
+
+
+# ============================================================
+# IDENTIFICAR A QUÉ OT PERTENECE UN MENSAJE
+#
+# Prioridad:
+# 1. ID de OT presente en archivo/texto.
+# 2. Mensaje al que está respondiendo.
+# 3. PDF pendiente más reciente del mismo tema.
+# ============================================================
+
+def identificar_registro_del_mensaje(
+    mensaje,
+):
+
+    documento = mensaje.document
+
+    texto = (
+        mensaje.text
+        or mensaje.caption
+        or ""
+    )
+
+    id_ot = None
+
+    if documento is not None:
+
+        id_ot = extraer_id_ot(
+            documento.file_name
+            or ""
+        )
+
+    if not id_ot:
+
+        id_ot = extraer_id_ot_de_texto(
+            texto
+        )
+
+    if id_ot:
+
+        indice, registro = (
+            buscar_pdf_original(
+                mensaje.chat_id,
+                mensaje.message_thread_id,
+                id_ot,
+            )
+        )
+
+        if registro is not None:
+            return indice, registro
+
+    respondido = (
+        mensaje.reply_to_message
+    )
+
+    if respondido is not None:
+
+        indice, registro = (
+            buscar_por_message_id(
+                mensaje.chat_id,
+                mensaje.message_thread_id,
+                respondido.message_id,
+            )
+        )
+
+        if registro is not None:
+            return indice, registro
+
+        documento_respondido = (
+            respondido.document
+        )
+
+        if documento_respondido is not None:
+
+            id_ot_respondido = extraer_id_ot(
+                documento_respondido.file_name
+                or ""
+            )
+
+            if id_ot_respondido:
+
+                indice, registro = (
+                    buscar_pdf_original(
+                        mensaje.chat_id,
+                        mensaje.message_thread_id,
+                        id_ot_respondido,
+                    )
+                )
+
+                if registro is not None:
+                    return indice, registro
+
+    return buscar_pdf_pendiente_reciente(
+        mensaje.chat_id,
+        mensaje.message_thread_id,
+    )
 
 
 # ============================================================
 # BORRAR MENSAJES RELACIONADOS CON LA EDICIÓN
 #
-# Conserva únicamente el mensaje que contiene el PDF final.
+# Conserva únicamente el mensaje con el PDF final.
 # ============================================================
 
 async def limpiar_mensajes_edicion(
@@ -492,24 +887,29 @@ async def limpiar_mensajes_edicion(
 ):
 
     mensajes = list(
-        registro.get(
-            "message_ids_limpieza",
-            [],
+        dict.fromkeys(
+            registro.get(
+                "message_ids_limpieza",
+                [],
+            )
         )
     )
 
-    # Asegurar que el PDF original también se elimine.
-    agregar_mensaje_a_limpieza(
-        registro,
-        registro.get("message_id"),
+    original_id = registro.get(
+        "message_id"
     )
 
-    mensajes = list(
-        registro.get(
-            "message_ids_limpieza",
-            [],
+    if (
+        original_id is not None
+        and original_id not in mensajes
+    ):
+        mensajes.insert(
+            0,
+            original_id,
         )
-    )
+
+    eliminados = 0
+    fallidos = 0
 
     for message_id in mensajes:
 
@@ -523,6 +923,8 @@ async def limpiar_mensajes_edicion(
                 message_id=message_id,
             )
 
+            eliminados += 1
+
             logger.info(
                 "MENSAJE DE EDICIÓN ELIMINADO | "
                 "ID_OT=%s | message_id=%s",
@@ -532,6 +934,8 @@ async def limpiar_mensajes_edicion(
 
         except Exception as error:
 
+            fallidos += 1
+
             logger.warning(
                 "NO SE PUDO ELIMINAR MENSAJE DE EDICIÓN | "
                 "ID_OT=%s | message_id=%s | error=%s",
@@ -539,6 +943,8 @@ async def limpiar_mensajes_edicion(
                 message_id,
                 error,
             )
+
+    return eliminados, fallidos
 
 
 # ============================================================
@@ -560,10 +966,11 @@ async def procesar_onlyoffice(
         or ""
     ).lower()
 
-    if not remitente.is_bot:
-        return False
-
-    if username != ONLYOFFICE_USERNAME:
+    if (
+        not remitente.is_bot
+        or username
+        != ONLYOFFICE_USERNAME
+    ):
         return False
 
     documento = mensaje.document
@@ -588,23 +995,18 @@ async def procesar_onlyoffice(
         texto,
     )
 
-    # Registrar todos los mensajes temporales de ONLYOFFICE
-    # en la OT pendiente más reciente del mismo chat y tema.
-    _, pendiente_reciente = buscar_pdf_pendiente_reciente(
-        mensaje.chat_id,
-        mensaje.message_thread_id,
+    indice_relacionado, registro_relacionado = (
+        identificar_registro_del_mensaje(
+            mensaje
+        )
     )
 
-    if pendiente_reciente is not None:
+    if registro_relacionado is not None:
+
         agregar_mensaje_a_limpieza(
-            pendiente_reciente,
+            registro_relacionado,
             mensaje.message_id,
         )
-
-    # --------------------------------------------------------
-    # Si no contiene documento todavía,
-    # puede ser "Send file" u otro mensaje.
-    # --------------------------------------------------------
 
     if documento is None:
         return True
@@ -619,10 +1021,6 @@ async def procesar_onlyoffice(
     ):
         return True
 
-    # --------------------------------------------------------
-    # Extraer ID único
-    # --------------------------------------------------------
-
     id_ot_final = extraer_id_ot(
         nombre_final
     )
@@ -630,23 +1028,12 @@ async def procesar_onlyoffice(
     if not id_ot_final:
 
         logger.warning(
-            "PDF FINAL DE ONLYOFFICE SIN ID DE OT | "
+            "PDF DE ONLYOFFICE SIN ID DE OT | "
             "archivo=%s",
             nombre_final,
         )
 
         return True
-
-    # --------------------------------------------------------
-    # Confirmar que ONLYOFFICE está enviando
-    # la versión FINAL.
-    #
-    # Inglés:
-    # Your file is ready...
-    #
-    # Español:
-    # Su archivo está listo...
-    # --------------------------------------------------------
 
     texto_normalizado = normalizar_texto(
         texto
@@ -673,22 +1060,6 @@ async def procesar_onlyoffice(
 
         return True
 
-    logger.info(
-        "PDF FINAL DETECTADO | "
-        "ID_OT=%s | archivo=%s | message_id=%s",
-        id_ot_final,
-        nombre_final,
-        mensaje.message_id,
-    )
-
-    # --------------------------------------------------------
-    # Buscar el PDF original usando solamente:
-    #
-    # CHAT
-    # TEMA
-    # ID OT
-    # --------------------------------------------------------
-
     indice, original = (
         buscar_pdf_original(
             mensaje.chat_id,
@@ -701,51 +1072,55 @@ async def procesar_onlyoffice(
 
         logger.warning(
             "PDF FINAL RECIBIDO PERO NO SE ENCONTRÓ ORIGINAL | "
-            "ID_OT=%s | archivo=%s | tema=%s",
+            "ID_OT=%s | archivo=%s | tema=%s | "
+            "estado=%s",
             id_ot_final,
             nombre_final,
             mensaje.message_thread_id,
+            ARCHIVO_ESTADO,
         )
 
         return True
 
+    # Registrar el mensaje final dentro de la relación,
+    # aunque se excluye expresamente durante el borrado.
+    agregar_mensaje_a_limpieza(
+        original,
+        mensaje.message_id,
+    )
+
     logger.info(
-        "COINCIDENCIA ENCONTRADA | "
-        "ID_OT=%s | "
-        "original_message_id=%s | "
+        "PDF FINAL DETECTADO | "
+        "ID_OT=%s | original_message_id=%s | "
         "final_message_id=%s",
         id_ot_final,
         original["message_id"],
         mensaje.message_id,
     )
 
-    # ========================================================
-    # LIMPIAR TODA LA CONVERSACIÓN DE EDICIÓN
-    #
-    # Se elimina:
-    # - PDF original
-    # - comando /open@ONLYOFFICE_bot
-    # - mensajes intermedios de ONLYOFFICE
-    # - aviso de enlace vencido
-    # - mensaje Send file
-    #
-    # Se conserva únicamente el PDF final.
-    # ========================================================
-
-    await limpiar_mensajes_edicion(
-        context,
-        original,
-        mensaje.message_id,
+    eliminados, fallidos = (
+        await limpiar_mensajes_edicion(
+            context,
+            original,
+            mensaje.message_id,
+        )
     )
 
-    # Eliminar el registro temporal aunque algún mensaje
-    # individual no haya podido borrarse.
-    PDF_PENDIENTES.pop(indice)
+    # El registro se elimina al finalizar para que no vuelva
+    # a asociarse con otra edición futura del mismo archivo.
+    PDF_PENDIENTES.pop(
+        indice
+    )
+
+    guardar_estado()
 
     logger.info(
         "LIMPIEZA FINALIZADA | "
-        "ID_OT=%s | PDF_FINAL=%s",
+        "ID_OT=%s | eliminados=%s | fallidos=%s | "
+        "PDF_FINAL=%s",
         id_ot_final,
+        eliminados,
+        fallidos,
         mensaje.message_id,
     )
 
@@ -845,8 +1220,9 @@ async def procesar_mensaje(
     # ========================================================
     # REGISTRAR COMANDO /OPEN DE ONLYOFFICE
     #
-    # Se relaciona con el PDF pendiente más reciente
-    # del mismo chat y tema para eliminarlo al finalizar.
+    # Si el comando responde a un PDF, se asocia directamente
+    # con ese PDF. Así funciona correctamente aunque se hayan
+    # cargado varios archivos al mismo tiempo.
     # ========================================================
 
     if texto:
@@ -864,25 +1240,39 @@ async def procesar_mensaje(
             )
         ):
 
-            _, pendiente_reciente = (
-                buscar_pdf_pendiente_reciente(
-                    mensaje.chat_id,
-                    mensaje.message_thread_id,
+            _, registro_open = (
+                identificar_registro_del_mensaje(
+                    mensaje
                 )
             )
 
-            if pendiente_reciente is not None:
+            if registro_open is not None:
 
                 agregar_mensaje_a_limpieza(
-                    pendiente_reciente,
+                    registro_open,
                     mensaje.message_id,
                 )
 
                 logger.info(
                     "COMANDO OPEN REGISTRADO PARA LIMPIEZA | "
-                    "ID_OT=%s | message_id=%s",
-                    pendiente_reciente["id_ot"],
+                    "ID_OT=%s | message_id=%s | "
+                    "reply_to=%s",
+                    registro_open["id_ot"],
                     mensaje.message_id,
+                    (
+                        mensaje.reply_to_message.message_id
+                        if mensaje.reply_to_message
+                        else None
+                    ),
+                )
+
+            else:
+
+                logger.warning(
+                    "COMANDO OPEN SIN PDF RELACIONADO | "
+                    "message_id=%s | tema=%s",
+                    mensaje.message_id,
+                    mensaje.message_thread_id,
                 )
 
     # ========================================================
@@ -1563,6 +1953,10 @@ def main():
 
     print(
         "Bot activo."
+    )
+
+    print(
+        f"Estado persistente: {ARCHIVO_ESTADO}"
     )
 
     print(
