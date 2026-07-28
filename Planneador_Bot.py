@@ -1,9 +1,7 @@
 import asyncio
-import json
 import logging
 import os
 import re
-import tempfile
 import unicodedata
 from datetime import datetime, timezone
 from math import ceil
@@ -50,34 +48,18 @@ ONLYOFFICE_USERNAME = "onlyoffice_bot"
 
 
 # ============================================================
-# ESTADO PERSISTENTE DE EDICIONES
+# EDICIONES ACTIVAS EN MEMORIA
 #
-# En Render:
-# - Si existe /var/data, se utiliza automáticamente.
-# - También puedes definir BOT_DATA_DIR.
+# Compatible con Render Free:
+# - No utiliza Disk.
+# - No requiere BOT_DATA_DIR.
+# - El registro se reconstruye desde el PDF al que responde
+#   el comando /open@ONLYOFFICE_bot.
 #
-# Para conservar el estado incluso después de reinicios o
-# despliegues, monta un Persistent Disk de Render en /var/data.
+# IMPORTANTE:
+# El comando /open debe enviarse respondiendo directamente
+# al PDF que se desea editar.
 # ============================================================
-
-DIRECTORIO_DATOS = os.getenv("BOT_DATA_DIR")
-
-if not DIRECTORIO_DATOS:
-    DIRECTORIO_DATOS = (
-        "/var/data"
-        if os.path.isdir("/var/data")
-        else os.getcwd()
-    )
-
-os.makedirs(
-    DIRECTORIO_DATOS,
-    exist_ok=True,
-)
-
-ARCHIVO_ESTADO = os.path.join(
-    DIRECTORIO_DATOS,
-    "pdf_pendientes.json",
-)
 
 PDF_PENDIENTES = []
 
@@ -91,155 +73,14 @@ def ahora_utc_iso():
 
 def cargar_estado():
 
-    global PDF_PENDIENTES
-
-    if not os.path.exists(
-        ARCHIVO_ESTADO
-    ):
-        PDF_PENDIENTES = []
-        return
-
-    try:
-
-        with open(
-            ARCHIVO_ESTADO,
-            "r",
-            encoding="utf-8",
-        ) as archivo:
-
-            datos = json.load(
-                archivo
-            )
-
-        if not isinstance(
-            datos,
-            list,
-        ):
-            raise ValueError(
-                "El estado guardado no es una lista."
-            )
-
-        registros_validos = []
-
-        for registro in datos:
-
-            if not isinstance(
-                registro,
-                dict,
-            ):
-                continue
-
-            if not registro.get(
-                "id_ot"
-            ):
-                continue
-
-            registro.setdefault(
-                "message_ids_limpieza",
-                [],
-            )
-
-            registro.setdefault(
-                "creado_en",
-                ahora_utc_iso(),
-            )
-
-            registros_validos.append(
-                registro
-            )
-
-        PDF_PENDIENTES = (
-            registros_validos
-        )
-
-        logger.info(
-            "ESTADO CARGADO | registros=%s | archivo=%s",
-            len(PDF_PENDIENTES),
-            ARCHIVO_ESTADO,
-        )
-
-    except Exception as error:
-
-        logger.error(
-            "NO SE PUDO CARGAR EL ESTADO | "
-            "archivo=%s | error=%s",
-            ARCHIVO_ESTADO,
-            error,
-        )
-
-        PDF_PENDIENTES = []
+    # En Render Free no se usa almacenamiento persistente.
+    return
 
 
 def guardar_estado():
 
-    directorio = os.path.dirname(
-        ARCHIVO_ESTADO
-    )
-
-    os.makedirs(
-        directorio,
-        exist_ok=True,
-    )
-
-    archivo_temporal = None
-
-    try:
-
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=directorio,
-            prefix="pdf_pendientes_",
-            suffix=".tmp",
-            delete=False,
-        ) as archivo:
-
-            json.dump(
-                PDF_PENDIENTES,
-                archivo,
-                ensure_ascii=False,
-                indent=2,
-            )
-
-            archivo.flush()
-            os.fsync(
-                archivo.fileno()
-            )
-
-            archivo_temporal = (
-                archivo.name
-            )
-
-        os.replace(
-            archivo_temporal,
-            ARCHIVO_ESTADO,
-        )
-
-    except Exception as error:
-
-        logger.error(
-            "NO SE PUDO GUARDAR EL ESTADO | "
-            "archivo=%s | error=%s",
-            ARCHIVO_ESTADO,
-            error,
-        )
-
-        if (
-            archivo_temporal
-            and os.path.exists(
-                archivo_temporal
-            )
-        ):
-
-            try:
-                os.remove(
-                    archivo_temporal
-                )
-            except OSError:
-                pass
-
-
-cargar_estado()
+    # Los registros viven únicamente mientras el proceso está activo.
+    return
 
 
 # ============================================================
@@ -779,6 +620,95 @@ def agregar_mensaje_a_limpieza(
 
 
 # ============================================================
+# RECONSTRUIR REGISTRO DESDE EL PDF RESPONDIDO
+#
+# Esto permite funcionar aunque Render haya reiniciado antes
+# de que el usuario envíe /open.
+# ============================================================
+
+def reconstruir_registro_desde_pdf_respondido(
+    mensaje,
+):
+
+    respondido = mensaje.reply_to_message
+
+    if respondido is None:
+        return None, None
+
+    documento = respondido.document
+
+    if documento is None:
+        return None, None
+
+    nombre = (
+        documento.file_name
+        or ""
+    )
+
+    if not nombre.lower().endswith(
+        ".pdf"
+    ):
+        return None, None
+
+    id_ot = extraer_id_ot(
+        nombre
+    )
+
+    if not id_ot:
+        return None, None
+
+    # Si ya existe, reutilizarlo.
+    indice, existente = (
+        buscar_pdf_original(
+            mensaje.chat_id,
+            mensaje.message_thread_id,
+            id_ot,
+        )
+    )
+
+    if existente is not None:
+
+        agregar_mensaje_a_limpieza(
+            existente,
+            respondido.message_id,
+        )
+
+        return indice, existente
+
+    registro = {
+        "chat_id": mensaje.chat_id,
+        "tema": mensaje.message_thread_id,
+        "message_id": respondido.message_id,
+        "nombre": nombre,
+        "id_ot": id_ot,
+        "message_ids_limpieza": [
+            respondido.message_id,
+        ],
+        "creado_en": ahora_utc_iso(),
+        "actualizado_en": ahora_utc_iso(),
+    }
+
+    PDF_PENDIENTES.append(
+        registro
+    )
+
+    indice = (
+        len(PDF_PENDIENTES) - 1
+    )
+
+    logger.info(
+        "REGISTRO RECONSTRUIDO DESDE RESPUESTA | "
+        "ID_OT=%s | original_message_id=%s | "
+        "archivo=%s",
+        id_ot,
+        respondido.message_id,
+        nombre,
+    )
+
+    return indice, registro
+
+
+# ============================================================
 # IDENTIFICAR A QUÉ OT PERTENECE UN MENSAJE
 #
 # Prioridad:
@@ -862,6 +792,18 @@ def identificar_registro_del_mensaje(
                         mensaje.chat_id,
                         mensaje.message_thread_id,
                         id_ot_respondido,
+                    )
+                )
+
+                if registro is not None:
+                    return indice, registro
+
+                # Si Render se reinició y perdió la memoria,
+                # reconstruir el registro desde el PDF original
+                # incluido en reply_to_message.
+                indice, registro = (
+                    reconstruir_registro_desde_pdf_respondido(
+                        mensaje
                     )
                 )
 
@@ -1073,11 +1015,10 @@ async def procesar_onlyoffice(
         logger.warning(
             "PDF FINAL RECIBIDO PERO NO SE ENCONTRÓ ORIGINAL | "
             "ID_OT=%s | archivo=%s | tema=%s | "
-            "estado=%s",
+            "modo=memoria_render_free",
             id_ot_final,
             nombre_final,
             mensaje.message_thread_id,
-            ARCHIVO_ESTADO,
         )
 
         return True
@@ -1187,7 +1128,9 @@ async def procesar_mensaje(
         "message_id=%s | "
         "tema=%s | "
         "archivo=%s | "
-        "file_id=%s",
+        "file_id=%s | "
+        "reply_to_message_id=%s | "
+        "reply_to_archivo=%s",
         (
             remitente.id
             if remitente
@@ -1213,6 +1156,19 @@ async def procesar_mensaje(
         (
             documento.file_id
             if documento
+            else None
+        ),
+        (
+            mensaje.reply_to_message.message_id
+            if mensaje.reply_to_message
+            else None
+        ),
+        (
+            mensaje.reply_to_message.document.file_name
+            if (
+                mensaje.reply_to_message
+                and mensaje.reply_to_message.document
+            )
             else None
         ),
     )
@@ -1956,7 +1912,7 @@ def main():
     )
 
     print(
-        f"Estado persistente: {ARCHIVO_ESTADO}"
+        "Modo de estado: memoria temporal (Render Free)"
     )
 
     print(
