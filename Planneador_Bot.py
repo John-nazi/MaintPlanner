@@ -56,6 +56,7 @@ ONLYOFFICE_USERNAME = "onlyoffice_bot"
 # - ID de OT
 # - nombre
 # - message_id
+# - mensajes temporales relacionados con la edición
 # ============================================================
 
 PDF_PENDIENTES = []
@@ -355,6 +356,11 @@ def registrar_pdf_original(
         "message_id": mensaje.message_id,
         "nombre": nombre,
         "id_ot": id_ot,
+        # Aquí se guardan todos los mensajes temporales
+        # relacionados con la edición de esta OT.
+        "message_ids_limpieza": [
+            mensaje.message_id,
+        ],
     }
 
     PDF_PENDIENTES.append(
@@ -425,6 +431,117 @@ def buscar_pdf_original(
 
 
 # ============================================================
+# BUSCAR PDF PENDIENTE MÁS RECIENTE DEL CHAT/TEMA
+# ============================================================
+
+def buscar_pdf_pendiente_reciente(
+    chat_id,
+    tema,
+):
+
+    for indice in range(
+        len(PDF_PENDIENTES) - 1,
+        -1,
+        -1,
+    ):
+
+        registro = PDF_PENDIENTES[indice]
+
+        if registro["chat_id"] != chat_id:
+            continue
+
+        if registro["tema"] != tema:
+            continue
+
+        return indice, registro
+
+    return None, None
+
+
+# ============================================================
+# AGREGAR MENSAJE A LA LIMPIEZA DE UNA OT
+# ============================================================
+
+def agregar_mensaje_a_limpieza(
+    registro,
+    message_id,
+):
+
+    if registro is None or message_id is None:
+        return
+
+    mensajes = registro.setdefault(
+        "message_ids_limpieza",
+        [],
+    )
+
+    if message_id not in mensajes:
+        mensajes.append(message_id)
+
+
+# ============================================================
+# BORRAR MENSAJES RELACIONADOS CON LA EDICIÓN
+#
+# Conserva únicamente el mensaje que contiene el PDF final.
+# ============================================================
+
+async def limpiar_mensajes_edicion(
+    context,
+    registro,
+    message_id_final,
+):
+
+    mensajes = list(
+        registro.get(
+            "message_ids_limpieza",
+            [],
+        )
+    )
+
+    # Asegurar que el PDF original también se elimine.
+    agregar_mensaje_a_limpieza(
+        registro,
+        registro.get("message_id"),
+    )
+
+    mensajes = list(
+        registro.get(
+            "message_ids_limpieza",
+            [],
+        )
+    )
+
+    for message_id in mensajes:
+
+        if message_id == message_id_final:
+            continue
+
+        try:
+
+            await context.bot.delete_message(
+                chat_id=registro["chat_id"],
+                message_id=message_id,
+            )
+
+            logger.info(
+                "MENSAJE DE EDICIÓN ELIMINADO | "
+                "ID_OT=%s | message_id=%s",
+                registro["id_ot"],
+                message_id,
+            )
+
+        except Exception as error:
+
+            logger.warning(
+                "NO SE PUDO ELIMINAR MENSAJE DE EDICIÓN | "
+                "ID_OT=%s | message_id=%s | error=%s",
+                registro["id_ot"],
+                message_id,
+                error,
+            )
+
+
+# ============================================================
 # PROCESAR MENSAJE DE ONLYOFFICE
 # ============================================================
 
@@ -470,6 +587,19 @@ async def procesar_onlyoffice(
         ),
         texto,
     )
+
+    # Registrar todos los mensajes temporales de ONLYOFFICE
+    # en la OT pendiente más reciente del mismo chat y tema.
+    _, pendiente_reciente = buscar_pdf_pendiente_reciente(
+        mensaje.chat_id,
+        mensaje.message_thread_id,
+    )
+
+    if pendiente_reciente is not None:
+        agregar_mensaje_a_limpieza(
+            pendiente_reciente,
+            mensaje.message_id,
+        )
 
     # --------------------------------------------------------
     # Si no contiene documento todavía,
@@ -590,42 +720,34 @@ async def procesar_onlyoffice(
     )
 
     # ========================================================
-    # ELIMINAR ÚNICAMENTE EL PDF ORIGINAL
+    # LIMPIAR TODA LA CONVERSACIÓN DE EDICIÓN
+    #
+    # Se elimina:
+    # - PDF original
+    # - comando /open@ONLYOFFICE_bot
+    # - mensajes intermedios de ONLYOFFICE
+    # - aviso de enlace vencido
+    # - mensaje Send file
+    #
+    # Se conserva únicamente el PDF final.
     # ========================================================
 
-    try:
+    await limpiar_mensajes_edicion(
+        context,
+        original,
+        mensaje.message_id,
+    )
 
-        await context.bot.delete_message(
-            chat_id=original["chat_id"],
-            message_id=original["message_id"],
-        )
+    # Eliminar el registro temporal aunque algún mensaje
+    # individual no haya podido borrarse.
+    PDF_PENDIENTES.pop(indice)
 
-        logger.info(
-            "PDF ORIGINAL ELIMINADO | "
-            "ID_OT=%s | "
-            "message_id=%s | "
-            "archivo=%s",
-            id_ot_final,
-            original["message_id"],
-            original["nombre"],
-        )
-
-        # Eliminar registro temporal
-        PDF_PENDIENTES.pop(
-            indice
-        )
-
-    except Exception as error:
-
-        logger.error(
-            "NO SE PUDO ELIMINAR PDF ORIGINAL | "
-            "ID_OT=%s | "
-            "message_id=%s | "
-            "error=%s",
-            id_ot_final,
-            original["message_id"],
-            error,
-        )
+    logger.info(
+        "LIMPIEZA FINALIZADA | "
+        "ID_OT=%s | PDF_FINAL=%s",
+        id_ot_final,
+        mensaje.message_id,
+    )
 
     return True
 
@@ -719,6 +841,49 @@ async def procesar_mensaje(
             else None
         ),
     )
+
+    # ========================================================
+    # REGISTRAR COMANDO /OPEN DE ONLYOFFICE
+    #
+    # Se relaciona con el PDF pendiente más reciente
+    # del mismo chat y tema para eliminarlo al finalizar.
+    # ========================================================
+
+    if texto:
+
+        primera_parte = (
+            texto.strip()
+            .split()[0]
+            .lower()
+        )
+
+        if (
+            primera_parte == "/open"
+            or primera_parte.startswith(
+                "/open@"
+            )
+        ):
+
+            _, pendiente_reciente = (
+                buscar_pdf_pendiente_reciente(
+                    mensaje.chat_id,
+                    mensaje.message_thread_id,
+                )
+            )
+
+            if pendiente_reciente is not None:
+
+                agregar_mensaje_a_limpieza(
+                    pendiente_reciente,
+                    mensaje.message_id,
+                )
+
+                logger.info(
+                    "COMANDO OPEN REGISTRADO PARA LIMPIEZA | "
+                    "ID_OT=%s | message_id=%s",
+                    pendiente_reciente["id_ot"],
+                    mensaje.message_id,
+                )
 
     # ========================================================
     # ONLYOFFICE
