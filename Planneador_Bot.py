@@ -37,11 +37,11 @@ URL_RENDER = os.getenv("RENDER_EXTERNAL_URL")
 
 SEMANAS_POR_PAGINA = 6
 
-# Borrado de comandos y respuestas temporales (Actualizado a 5 segundos)
-TIEMPO_BORRADO = 5
+# Borrado de comandos y respuestas temporales (Actualizado a 15 segundos)
+TIEMPO_BORRADO = 15
 
-# Aviso de moderación (Mantenido en 5 segundos)
-TIEMPO_BORRADO_AVISO = 5
+# Aviso de moderación (Mantenido en 15 segundos)
+TIEMPO_BORRADO_AVISO = 15
 
 # Usuario oficial de ONLYOFFICE
 ONLYOFFICE_USERNAME = "onlyoffice_bot"
