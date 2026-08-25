@@ -37,14 +37,101 @@ URL_RENDER = os.getenv("RENDER_EXTERNAL_URL")
 
 SEMANAS_POR_PAGINA = 6
 
-# Borrado de comandos y respuestas temporales (Actualizado a 15 segundos)
+# Tiempo asignado para el temporizador visual y autodestrucción
 TIEMPO_BORRADO = 15
-
-# Aviso de moderación (Mantenido en 15 segundos)
-TIEMPO_BORRADO_AVISO = 15
 
 # Usuario oficial de ONLYOFFICE
 ONLYOFFICE_USERNAME = "onlyoffice_bot"
+
+# ============================================================
+# GESTOR DE AUTODESTRUCCIÓN Y BARRIDO PROFUNDO
+# ============================================================
+LIMPIEZAS_ACTIVAS = {}  # Guarda las tareas de limpieza por chat_id
+
+async def reiniciar_temporizador(context, chat_id, current_msg_id):
+    """
+    Cancela cualquier limpieza en curso y crea una nueva.
+    Esto permite que si el usuario sigue interactuando, el menú no se borre.
+    """
+    if chat_id in LIMPIEZAS_ACTIVAS:
+        info = LIMPIEZAS_ACTIVAS[chat_id]
+        info['task'].cancel()
+        try:
+            if info['timer_msg_id']:
+                await context.bot.delete_message(chat_id=chat_id, message_id=info['timer_msg_id'])
+        except Exception:
+            pass
+        del LIMPIEZAS_ACTIVAS[chat_id]
+        
+    tarea = context.application.create_task(
+        rutina_limpieza_chat(context, chat_id, current_msg_id, TIEMPO_BORRADO)
+    )
+    LIMPIEZAS_ACTIVAS[chat_id] = {'task': tarea, 'timer_msg_id': None}
+
+async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total):
+    """
+    Muestra el temporizador visual y luego borra los últimos 80 mensajes del chat
+    para garantizar que se elimine todo (incluso lo de antes de que Render despertara).
+    """
+    try:
+        # 1. Enviar mensaje inicial del timer
+        msg_timer = await context.bot.send_message(
+            chat_id=chat_id,
+            text="⏳ *Iniciando protocolo de limpieza...*",
+            parse_mode="Markdown"
+        )
+        
+        # Registrar el ID para poder borrar el timer si se interrumpe
+        if chat_id in LIMPIEZAS_ACTIVAS:
+            LIMPIEZAS_ACTIVAS[chat_id]['timer_msg_id'] = msg_timer.message_id
+            
+        id_tope = msg_timer.message_id
+
+        # 2. Secuencia de actualización (Efecto Visual)
+        # Se actualiza en estos segundos restantes para evitar bloqueo por spam (Rate Limit de Telegram)
+        tiempos = [10, 5, 3, 2, 1]
+        tiempos = [t for t in tiempos if t < tiempo_total]
+        
+        tiempo_restante = tiempo_total
+        
+        for t in tiempos:
+            espera = tiempo_restante - t
+            if espera > 0:
+                await asyncio.sleep(espera)
+            
+            tiempo_restante = t
+            
+            # Calcular la barra de progreso
+            progreso = int(((tiempo_total - t) / tiempo_total) * 10)
+            barra = "🟥" * progreso + "🟩" * (10 - progreso)
+            texto = f"⚠️ *AUTODESTRUCCIÓN DEL CHAT* ⚠️\n\n{barra}\n\n🧹 Limpiando todo en: *{t} segundos*"
+            
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=id_tope,
+                    text=texto,
+                    parse_mode="Markdown"
+                )
+            except Exception:
+                pass # Ignorar si el mensaje fue borrado manualmente
+
+        # Esperar el último segundo
+        if tiempo_restante > 0:
+            await asyncio.sleep(tiempo_restante)
+
+        # 3. Barrido profundo (La limpieza final)
+        # Borra 80 mensajes hacia atrás "a ciegas". 
+        # Esto soluciona los mensajes acumulados mientras el bot dormía en Render.
+        for i in range(80):
+            try:
+                await context.bot.delete_message(chat_id=chat_id, message_id=id_tope - i)
+            except Exception:
+                pass # Ignorar si el mensaje ya no existe o es demasiado viejo
+
+    except asyncio.CancelledError:
+        # Si se cancela la tarea, simplemente terminamos en silencio
+        raise
 
 # ============================================================
 # EDICIONES ACTIVAS EN MEMORIA
@@ -196,7 +283,7 @@ AREAS = {
 }
 
 # ============================================================
-# FUNCIONES AUXILIARES Y LÓGICA DE PDF (Mantenidas)
+# FUNCIONES AUXILIARES DE TEXTO
 # ============================================================
 
 def extraer_id_ot(nombre_archivo):
@@ -231,18 +318,6 @@ async def comando_es_para_este_bot(update, context, comando):
 
     return False
 
-async def borrar_mensaje_despues(context, chat_id, message_id, segundos):
-    await asyncio.sleep(segundos)
-    try:
-        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-    except Exception as error:
-        logger.warning("No se pudo borrar mensaje %s: %s", message_id, error)
-
-def programar_borrado(context, chat_id, message_id, segundos=TIEMPO_BORRADO):
-    context.application.create_task(
-        borrar_mensaje_despues(context, chat_id, message_id, segundos)
-    )
-
 def normalizar_texto(texto):
     texto = texto.lower()
     texto = unicodedata.normalize("NFD", texto)
@@ -259,279 +334,8 @@ def contiene_palabra_prohibida(texto):
             return True
     return False
 
-def extraer_id_ot_de_texto(texto):
-    if not texto:
-        return None
-    coincidencia = re.search(r"(?<!\d)(\d{6,})_", texto)
-    if not coincidencia:
-        return None
-    return coincidencia.group(1)
-
-def registrar_pdf_original(mensaje):
-    documento = mensaje.document
-    if documento is None:
-        return
-        
-    nombre = documento.file_name or ""
-    if not nombre.lower().endswith(".pdf"):
-        return
-
-    id_ot = extraer_id_ot(nombre)
-    if not id_ot:
-        logger.info("PDF IGNORADO SIN ID DE OT | archivo=%s", nombre)
-        return
-
-    for registro in PDF_PENDIENTES:
-        if registro.get("chat_id") == mensaje.chat_id and registro.get("message_id") == mensaje.message_id:
-            return
-
-    registro = {
-        "chat_id": mensaje.chat_id,
-        "tema": mensaje.message_thread_id,
-        "message_id": mensaje.message_id,
-        "nombre": nombre,
-        "id_ot": id_ot,
-        "message_ids_limpieza": [mensaje.message_id],
-        "creado_en": ahora_utc_iso(),
-        "actualizado_en": ahora_utc_iso(),
-    }
-    PDF_PENDIENTES.append(registro)
-    guardar_estado()
-    
-    logger.info(
-        "PDF ORIGINAL REGISTRADO | ID_OT=%s | chat=%s | tema=%s | message_id=%s | archivo=%s",
-        id_ot, registro["chat_id"], registro["tema"], registro["message_id"], registro["nombre"]
-    )
-
-def buscar_pdf_original(chat_id, tema, id_ot):
-    for indice in range(len(PDF_PENDIENTES) - 1, -1, -1):
-        registro = PDF_PENDIENTES[indice]
-        if registro.get("chat_id") != chat_id:
-            continue
-        if registro.get("tema") != tema:
-            continue
-        if str(registro.get("id_ot")) != str(id_ot):
-            continue
-        return indice, registro
-    return None, None
-
-def buscar_por_message_id(chat_id, tema, message_id):
-    if message_id is None:
-        return None, None
-    for indice in range(len(PDF_PENDIENTES) - 1, -1, -1):
-        registro = PDF_PENDIENTES[indice]
-        if registro.get("chat_id") != chat_id:
-            continue
-        if registro.get("tema") != tema:
-            continue
-        mensajes = registro.get("message_ids_limpieza", [])
-        if registro.get("message_id") == message_id or message_id in mensajes:
-            return indice, registro
-    return None, None
-
-def buscar_pdf_pendiente_reciente(chat_id, tema):
-    for indice in range(len(PDF_PENDIENTES) - 1, -1, -1):
-        registro = PDF_PENDIENTES[indice]
-        if registro.get("chat_id") != chat_id:
-            continue
-        if registro.get("tema") != tema:
-            continue
-        return indice, registro
-    return None, None
-
-def agregar_mensaje_a_limpieza(registro, message_id):
-    if registro is None or message_id is None:
-        return False
-    mensajes = registro.setdefault("message_ids_limpieza", [])
-    if message_id in mensajes:
-        return False
-    mensajes.append(message_id)
-    registro["actualizado_en"] = ahora_utc_iso()
-    guardar_estado()
-    return True
-
-def reconstruir_registro_desde_pdf_respondido(mensaje):
-    respondido = mensaje.reply_to_message
-    if respondido is None:
-        return None, None
-    documento = respondido.document
-    if documento is None:
-        return None, None
-    nombre = documento.file_name or ""
-    if not nombre.lower().endswith(".pdf"):
-        return None, None
-    id_ot = extraer_id_ot(nombre)
-    if not id_ot:
-        return None, None
-
-    indice, existente = buscar_pdf_original(
-        mensaje.chat_id, mensaje.message_thread_id, id_ot
-    )
-    if existente is not None:
-        agregar_mensaje_a_limpieza(existente, respondido.message_id)
-        return indice, existente
-
-    registro = {
-        "chat_id": mensaje.chat_id,
-        "tema": mensaje.message_thread_id,
-        "message_id": respondido.message_id,
-        "nombre": nombre,
-        "id_ot": id_ot,
-        "message_ids_limpieza": [respondido.message_id],
-        "creado_en": ahora_utc_iso(),
-        "actualizado_en": ahora_utc_iso(),
-    }
-    PDF_PENDIENTES.append(registro)
-    indice = len(PDF_PENDIENTES) - 1
-    
-    logger.info(
-        "REGISTRO RECONSTRUIDO DESDE RESPUESTA | ID_OT=%s | original_message_id=%s | archivo=%s",
-        id_ot, respondido.message_id, nombre
-    )
-    return indice, registro
-
-def identificar_registro_del_mensaje(mensaje):
-    documento = mensaje.document
-    texto = mensaje.text or mensaje.caption or ""
-    id_ot = None
-
-    if documento is not None:
-        id_ot = extraer_id_ot(documento.file_name or "")
-    if not id_ot:
-        id_ot = extraer_id_ot_de_texto(texto)
-
-    if id_ot:
-        indice, registro = buscar_pdf_original(
-            mensaje.chat_id, mensaje.message_thread_id, id_ot
-        )
-        if registro is not None:
-            return indice, registro
-
-    respondido = mensaje.reply_to_message
-    if respondido is not None:
-        indice, registro = buscar_por_message_id(
-            mensaje.chat_id, mensaje.message_thread_id, respondido.message_id
-        )
-        if registro is not None:
-            return indice, registro
-
-        documento_respondido = respondido.document
-        if documento_respondido is not None:
-            id_ot_respondido = extraer_id_ot(documento_respondido.file_name or "")
-            if id_ot_respondido:
-                indice, registro = buscar_pdf_original(
-                    mensaje.chat_id, mensaje.message_thread_id, id_ot_respondido
-                )
-                if registro is not None:
-                    return indice, registro
-                
-                indice, registro = reconstruir_registro_desde_pdf_respondido(mensaje)
-                if registro is not None:
-                    return indice, registro
-
-    return buscar_pdf_pendiente_reciente(mensaje.chat_id, mensaje.message_thread_id)
-
-async def limpiar_mensajes_edicion(context, registro, message_id_final):
-    mensajes = list(dict.fromkeys(registro.get("message_ids_limpieza", [])))
-    original_id = registro.get("message_id")
-
-    if original_id is not None and original_id not in mensajes:
-        mensajes.insert(0, original_id)
-
-    eliminados = 0
-    fallidos = 0
-
-    for message_id in mensajes:
-        if message_id == message_id_final:
-            continue
-        try:
-            await context.bot.delete_message(
-                chat_id=registro["chat_id"], message_id=message_id
-            )
-            eliminados += 1
-            logger.info("MENSAJE DE EDICIÓN ELIMINADO | ID_OT=%s | message_id=%s", registro["id_ot"], message_id)
-        except Exception as error:
-            fallidos += 1
-            logger.warning("NO SE PUDO ELIMINAR MENSAJE DE EDICIÓN | ID_OT=%s | message_id=%s | error=%s", registro["id_ot"], message_id, error)
-
-    return eliminados, fallidos
-
-async def procesar_onlyoffice(mensaje, context):
-    remitente = mensaje.from_user
-    if remitente is None:
-        return False
-        
-    username = (remitente.username or "").lower()
-    if not remitente.is_bot or username != ONLYOFFICE_USERNAME:
-        return False
-
-    documento = mensaje.document
-    texto = mensaje.text or mensaje.caption or ""
-
-    logger.info(
-        "ONLYOFFICE DETECTADO | message_id=%s | tema=%s | archivo=%s | texto=%r",
-        mensaje.message_id, mensaje.message_thread_id, (documento.file_name if documento else None), texto
-    )
-
-    indice_relacionado, registro_relacionado = identificar_registro_del_mensaje(mensaje)
-
-    if registro_relacionado is not None:
-        agregar_mensaje_a_limpieza(registro_relacionado, mensaje.message_id)
-
-    if documento is None:
-        return True
-
-    nombre_final = documento.file_name or ""
-    if not nombre_final.lower().endswith(".pdf"):
-        return True
-
-    id_ot_final = extraer_id_ot(nombre_final)
-    if not id_ot_final:
-        logger.warning("PDF DE ONLYOFFICE SIN ID DE OT | archivo=%s", nombre_final)
-        return True
-
-    texto_normalizado = normalizar_texto(texto)
-    es_version_final = any(
-        frase in texto_normalizado
-        for frase in ["your file is ready", "final version", "su archivo esta listo", "version final"]
-    )
-
-    if not es_version_final:
-        logger.info("MENSAJE ONLYOFFICE NO ES VERSIÓN FINAL | ID_OT=%s | archivo=%s", id_ot_final, nombre_final)
-        return True
-
-    indice, original = buscar_pdf_original(
-        mensaje.chat_id, mensaje.message_thread_id, id_ot_final
-    )
-    if original is None:
-        logger.warning(
-            "PDF FINAL RECIBIDO PERO NO SE ENCONTRÓ ORIGINAL | ID_OT=%s | archivo=%s | tema=%s | modo=memoria_render_free",
-            id_ot_final, nombre_final, mensaje.message_thread_id
-        )
-        return True
-
-    agregar_mensaje_a_limpieza(original, mensaje.message_id)
-    
-    logger.info(
-        "PDF FINAL DETECTADO | ID_OT=%s | original_message_id=%s | final_message_id=%s",
-        id_ot_final, original["message_id"], mensaje.message_id
-    )
-
-    eliminados, fallidos = await limpiar_mensajes_edicion(
-        context, original, mensaje.message_id
-    )
-
-    PDF_PENDIENTES.pop(indice)
-    guardar_estado()
-
-    logger.info(
-        "LIMPIEZA FINALIZADA | ID_OT=%s | eliminados=%s | fallidos=%s | PDF_FINAL=%s",
-        id_ot_final, eliminados, fallidos, mensaje.message_id
-    )
-    return True
-
 # ============================================================
-# PROCESAR TODOS LOS MENSAJES (Ahora borra absolutamente todo)
+# PROCESAR TODOS LOS MENSAJES (Activador de limpieza)
 # ============================================================
 
 async def procesar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -539,63 +343,27 @@ async def procesar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if mensaje is None:
         return
 
-    # PROGRAMAR BORRADO GLOBAL A 5 SEGUNDOS PARA CUALQUIER MENSAJE
-    programar_borrado(context, mensaje.chat_id, mensaje.message_id, TIEMPO_BORRADO)
+    # Iniciar o reiniciar el barrido profundo con cada mensaje recibido
+    await reiniciar_temporizador(context, mensaje.chat_id, mensaje.message_id)
 
     texto = mensaje.text or mensaje.caption or ""
     remitente = mensaje.from_user
-    documento = mensaje.document
 
-    logger.info(
-        "MENSAJE RECIBIDO | chat=%s | tipo=%s | tema=%s | texto=%r",
-        mensaje.chat_id, (mensaje.chat.type if mensaje.chat else None), mensaje.message_thread_id, texto
-    )
-
-    if texto:
-        primera_parte = texto.strip().split()[0].lower()
-        if primera_parte == "/open" or primera_parte.startswith("/open@"):
-            _, registro_open = identificar_registro_del_mensaje(mensaje)
-            if registro_open is not None:
-                agregar_mensaje_a_limpieza(registro_open, mensaje.message_id)
-            else:
-                logger.warning(
-                    "COMANDO OPEN SIN PDF RELACIONADO | message_id=%s | tema=%s",
-                    mensaje.message_id, mensaje.message_thread_id
-                )
-
-    if remitente and remitente.is_bot and (remitente.username or "").lower() == ONLYOFFICE_USERNAME:
-        await procesar_onlyoffice(mensaje, context)
+    # Ignorar mensajes largos o comandos normales para el resto de la lógica
+    if not texto or texto.startswith("/"):
         return
 
-    if documento:
-        nombre = documento.file_name or ""
-        if nombre.lower().endswith(".pdf"):
-            registrar_pdf_original(mensaje)
-
-    if not texto:
-        return
-    if texto.startswith("/"):
-        return
-    if not contiene_palabra_prohibida(texto):
-        return
-
-    logger.info("PALABRA PROHIBIDA DETECTADA | mensaje=%s", mensaje.message_id)
-    
-    try:
-        await context.bot.delete_message(chat_id=mensaje.chat_id, message_id=mensaje.message_id)
-    except Exception as error:
-        logger.error("NO SE PUDO ELIMINAR EL MENSAJE: %s", error)
-        return
-
-    try:
-        aviso = await context.bot.send_message(
-            chat_id=mensaje.chat_id,
-            message_thread_id=mensaje.message_thread_id,
-            text="⚠️ Mensaje eliminado por contener lenguaje no permitido.",
-        )
-        programar_borrado(context, aviso.chat_id, aviso.message_id, TIEMPO_BORRADO_AVISO)
-    except Exception as error:
-        logger.warning("No se pudo enviar aviso: %s", error)
+    # Si contiene groserías, se borra de inmediato y el aviso se destruirá con el barrido general
+    if contiene_palabra_prohibida(texto):
+        try:
+            await context.bot.delete_message(chat_id=mensaje.chat_id, message_id=mensaje.message_id)
+            await context.bot.send_message(
+                chat_id=mensaje.chat_id,
+                message_thread_id=mensaje.message_thread_id,
+                text="⚠️ Mensaje eliminado por contener lenguaje no permitido.",
+            )
+        except Exception:
+            pass
 
 # ============================================================
 # FUNCIONES DE MENÚ Y NAVEGACIÓN
@@ -634,16 +402,10 @@ def crear_menu_semanas(clave_area, pagina=0):
 
     if not semanas:
         botones.append([
-            InlineKeyboardButton(
-                "⚠️ No hay semanas configuradas",
-                callback_data="sin_semanas",
-            )
+            InlineKeyboardButton("⚠️ No hay semanas configuradas", callback_data="sin_semanas")
         ])
         botones.append([
-            InlineKeyboardButton(
-                "⬅ Volver a las áreas",
-                callback_data="volver_areas",
-            )
+            InlineKeyboardButton("⬅ Volver a las áreas", callback_data="volver_areas")
         ])
         return InlineKeyboardMarkup(botones)
 
@@ -654,43 +416,20 @@ def crear_menu_semanas(clave_area, pagina=0):
 
     for numero in semanas[inicio:fin]:
         botones.append([
-            InlineKeyboardButton(
-                text=f"📁 SEMANA {numero:02d}",
-                url=semanas_configuradas[numero],
-            )
+            InlineKeyboardButton(text=f"📁 SEMANA {numero:02d}", url=semanas_configuradas[numero])
         ])
 
     navegacion = []
     if pagina > 0:
-        navegacion.append(
-            InlineKeyboardButton(
-                "◀ Anterior",
-                callback_data=f"semanas:{clave_area}:{pagina - 1}",
-            )
-        )
+        navegacion.append(InlineKeyboardButton("◀ Anterior", callback_data=f"semanas:{clave_area}:{pagina - 1}"))
         
-    navegacion.append(
-        InlineKeyboardButton(
-            f"{pagina + 1} de {total_paginas}",
-            callback_data="pagina_actual",
-        )
-    )
+    navegacion.append(InlineKeyboardButton(f"{pagina + 1} de {total_paginas}", callback_data="pagina_actual"))
     
     if pagina < (total_paginas - 1):
-        navegacion.append(
-            InlineKeyboardButton(
-                "Siguiente ▶",
-                callback_data=f"semanas:{clave_area}:{pagina + 1}",
-            )
-        )
+        navegacion.append(InlineKeyboardButton("Siguiente ▶", callback_data=f"semanas:{clave_area}:{pagina + 1}"))
 
     botones.append(navegacion)
-    botones.append([
-        InlineKeyboardButton(
-            "⬅ Volver a las áreas",
-            callback_data="volver_areas",
-        )
-    ])
+    botones.append([InlineKeyboardButton("⬅ Volver a las áreas", callback_data="volver_areas")])
     return InlineKeyboardMarkup(botones)
 
 # ============================================================
@@ -705,14 +444,13 @@ async def iniciar(update, context):
     if mensaje is None:
         return
         
-    programar_borrado(context, mensaje.chat_id, mensaje.message_id)
-    
     respuesta = await mensaje.reply_text(
         "🤖 *Bot de Planeación activo*\n\n"
         "Utiliza /areas para consultar las carpetas de Órdenes de Trabajo Semanales.",
         parse_mode="Markdown",
     )
-    programar_borrado(context, respuesta.chat_id, respuesta.message_id)
+    # Activamos el timer con el ID de la respuesta
+    await reiniciar_temporizador(context, respuesta.chat_id, respuesta.message_id)
 
 async def mostrar_areas(update, context):
     if not await comando_es_para_este_bot(update, context, "areas"):
@@ -722,15 +460,12 @@ async def mostrar_areas(update, context):
     if mensaje is None:
         return
         
-    programar_borrado(context, mensaje.chat_id, mensaje.message_id)
-    
     respuesta = await mensaje.reply_text(
-        "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\n"
-        "Selecciona el área:",
+        "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\nSelecciona el área:",
         reply_markup=crear_menu_areas(),
         parse_mode="Markdown",
     )
-    programar_borrado(context, respuesta.chat_id, respuesta.message_id)
+    await reiniciar_temporizador(context, respuesta.chat_id, respuesta.message_id)
 
 async def seleccionar_area(update, context):
     consulta = update.callback_query
@@ -738,6 +473,9 @@ async def seleccionar_area(update, context):
         return
         
     await consulta.answer()
+    
+    # Cada clic en el menú reinicia el timer, dándole más tiempo al usuario
+    await reiniciar_temporizador(context, consulta.message.chat_id, consulta.message.message_id)
     
     try:
         clave = consulta.data.split(":")[1]
@@ -763,6 +501,8 @@ async def cambiar_pagina(update, context):
     if not consulta:
         return
         
+    await reiniciar_temporizador(context, consulta.message.chat_id, consulta.message.message_id)
+    
     datos = consulta.data or ""
     if datos == "pagina_actual":
         await consulta.answer()
@@ -789,6 +529,7 @@ async def volver_areas(update, context):
     if not consulta:
         return
         
+    await reiniciar_temporizador(context, consulta.message.chat_id, consulta.message.message_id)
     await consulta.answer()
     await consulta.edit_message_text(
         "📁 *Carpetas de Órdenes de Trabajo Semanales*\n\nSelecciona el área:",
@@ -822,8 +563,7 @@ def main():
     ruta = "telegram"
     url_webhook = f"{URL_RENDER}/{ruta}"
 
-    print("Bot activo.")
-    print("Modo de estado: memoria temporal efímera (Render Free)")
+    print("Bot activo. Modo Autodestrucción y Barrido Profundo Habilitado.")
     print(f"Webhook: {url_webhook}")
 
     aplicacion.run_webhook(
