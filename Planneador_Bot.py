@@ -99,7 +99,7 @@ AREAS = {
         "nombre": "Pintura y Secuenciado",
         "icono": "🔴",
         "semanas": {
-            52: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgAE7H0CprJjQLbrNTJ3FRagAbNNourBQiUJGbRGE57FKEQ?e=hqaoG6",
+            52: "",
             51: "PEGA_AQUI_LINK_PINTURA_SEMANA_51",
             50: "PEGA_AQUI_LINK_PINTURA_SEMANA_50",
             49: "PEGA_AQUI_LINK_PINTURA_SEMANA_49",
@@ -175,7 +175,7 @@ AREAS = {
             38: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_38",
             37: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_37",
             36: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_36",
-            35: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_35",
+            35: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgAE7H0CprJjQLbrNTJ3FRagAbNNourBQiUJGbRGE57FKEQ?e=hqaoG6",
             34: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_34",
             33: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_33",
             32: "PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_32",
