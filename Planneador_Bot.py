@@ -89,7 +89,7 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total):
 
         # 2. Secuencia de actualización (Efecto Visual)
         # Se actualiza en estos segundos restantes para evitar bloqueo por spam (Rate Limit de Telegram)
-        tiempos = [10, 5, 3, 2, 1]
+        tiempos = [15,10, 5, 3, 2, 1],
         tiempos = [t for t in tiempos if t < tiempo_total]
         
         tiempo_restante = tiempo_total
@@ -102,8 +102,8 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total):
             tiempo_restante = t
             
             # Calcular la barra de progreso
-            progreso = int(((tiempo_total - t) / tiempo_total) * 10)
-            barra = "🟥" * progreso + "🟩" * (10 - progreso)
+            progreso = int(((tiempo_total - t) / tiempo_total) * 15)
+            barra = "🟥" * progreso + "🟩" * (15 - progreso)
             texto = f"⚠️ *AUTODESTRUCCIÓN DEL CHAT* ⚠️\n\n{barra}\n\n🧹 Limpiando todo en: *{t} segundos*"
             
             try:
@@ -185,7 +185,7 @@ AREAS = {
             38: "PEGA_AQUI_LINK_PINTURA_SEMANA_38",
             37: "PEGA_AQUI_LINK_PINTURA_SEMANA_37",
             36: "PEGA_AQUI_LINK_PINTURA_SEMANA_36",
-            35: "PEGA_AQUI_LINK_PINTURA_SEMANA_35",
+            35: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgB25IyE1cX0SKy5ETNt5mzrAV1sJlVnZ6djNQAD6AyqAtQ?e=qkF8Wc",
             34: "PEGA_AQUI_LINK_PINTURA_SEMANA_34",
             33: "PEGA_AQUI_LINK_PINTURA_SEMANA_33",
             32: "PEGA_AQUI_LINK_PINTURA_SEMANA_32",
