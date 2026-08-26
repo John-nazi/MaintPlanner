@@ -534,8 +534,8 @@ async def iniciar(update, context):
     programar_borrado(context, mensaje.chat_id, mensaje.message_id)
 
     respuesta = await mensaje.reply_text(
-        "🚀 *SISTEMA DE GESTIÓN CENTRALIZADO* 🚀\n\n"
-        "Bienvenido a la terminal operativa. Aquí puedes consultar las Órdenes de Trabajo Semanales.\n\n"
+        "🚀 *Sistema Integral de Gestión y Seguimiento de OTs MPS* 🚀\n\n"
+        "Bienvenido. Aquí puedes consultar las Órdenes de Trabajo Semanales.\n\n"
         "👉 Envía /areas para desplegar el directorio maestro.",
         parse_mode="Markdown",
     )
