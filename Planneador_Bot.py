@@ -44,10 +44,7 @@ SEMANAS_POR_PAGINA = 6
 TIEMPO_BORRADO = 15  
 # 👆 ============================================================================ 👆
 
-# Tiempos visuales donde la cuenta regresiva actualizará la pantalla.
-# Si aumentas el TIEMPO_BORRADO (ej. a 60), puedes agregar números como 45, 30, 20 aquí.
 INTERVALOS_TIMER = [10, 5, 4, 3, 2, 1]
-
 BARRIDO_CANTIDAD = 100
 TIEMPO_BORRADO_AVISO = 5
 
@@ -68,7 +65,9 @@ PALABRAS_PROHIBIDAS = [
 
 
 # ============================================================
-# ÁREAS (BASE DE DATOS EN MEMORIA)
+# ÁREAS Y LINKS SEMANALES
+# Pega tus enlaces de SharePoint/Drive entre las comillas "".
+# El bot SOLO mostrará las semanas que tengan un link válido (http/https).
 # ============================================================
 
 AREAS = {
@@ -76,16 +75,116 @@ AREAS = {
         "nombre": "Pintura y Secuenciado",
         "icono": "🔴",
         "semanas": {
-            numero: f"PEGA_AQUI_LINK_PINTURA_SEMANA_{numero:02d}"
-            for numero in range(52, 0, -1)
+            52: "",
+            51: "",
+            50: "",
+            49: "",
+            48: "",
+            47: "",
+            46: "",
+            45: "",
+            44: "",
+            43: "",
+            42: "",
+            41: "",
+            40: "",
+            39: "",
+            38: "",
+            37: "",
+            36: "",
+            35: "",
+            34: "",
+            33: "",
+            32: "",
+            31: "",
+            30: "",
+            29: "",
+            28: "",
+            27: "",
+            26: "",
+            25: "",
+            24: "",
+            23: "",
+            22: "",
+            21: "",
+            20: "",
+            19: "",
+            18: "",
+            17: "",
+            16: "",
+            15: "",
+            14: "",
+            13: "",
+            12: "",
+            11: "",
+            10: "",
+            9: "",
+            8: "",
+            7: "",
+            6: "",
+            5: "",
+            4: "",
+            3: "",
+            2: "",
+            1: "",
         },
     },
     "eco_custom": {
         "nombre": "Eco-Custom",
         "icono": "🟢",
         "semanas": {
-            numero: f"PEGA_AQUI_LINK_ECO_CUSTOM_SEMANA_{numero:02d}"
-            for numero in range(52, 0, -1)
+            52: "",
+            51: "",
+            50: "",
+            49: "",
+            48: "",
+            47: "",
+            46: "",
+            45: "",
+            44: "",
+            43: "",
+            42: "",
+            41: "",
+            40: "",
+            39: "",
+            38: "",
+            37: "",
+            36: "",
+            35: "",
+            34: "",
+            33: "",
+            32: "",
+            31: "",
+            30: "",
+            29: "",
+            28: "",
+            27: "",
+            26: "",
+            25: "",
+            24: "",
+            23: "",
+            22: "",
+            21: "",
+            20: "",
+            19: "",
+            18: "",
+            17: "",
+            16: "",
+            15: "",
+            14: "",
+            13: "",
+            12: "",
+            11: "",
+            10: "",
+            9: "",
+            8: "",
+            7: "",
+            6: "",
+            5: "",
+            4: "",
+            3: "",
+            2: "",
+            1: "",
         },
     },
 }
@@ -372,7 +471,8 @@ def obtener_semanas_configuradas(clave_area):
     resultado = {}
     for numero, enlace in area["semanas"].items():
         enlace = enlace.strip()
-        if not enlace.startswith("PEGA_AQUI_LINK_"):
+        # Validación: Solo extrae enlaces que sean URLs válidas
+        if enlace.startswith(("http://", "https://")):
             resultado[numero] = enlace
     return resultado
 
