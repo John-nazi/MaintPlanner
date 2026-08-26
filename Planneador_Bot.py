@@ -151,7 +151,7 @@ AREAS = {
             37: "",
             36: "",
             35: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgAE7H0CprJjQLbrNTJ3FRagAbNNourBQiUJGbRGE57FKEQ?e=efmmxN",
-            34: "",
+            34: "https://mega.nz/folder/y5JwkJBT#1rzRs7sMZmX5Q8722n4Evw",
             33: "",
             32: "",
             31: "",
