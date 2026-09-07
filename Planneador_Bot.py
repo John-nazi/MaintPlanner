@@ -41,7 +41,7 @@ SEMANAS_POR_PAGINA = 6
 # ============================================================
 
 # 👇 MODIFICA ESTE VALOR PARA CAMBIAR EL TIEMPO DE AUTODESTRUCCIÓN (en segundos) 👇
-TIEMPO_BORRADO = 15  
+TIEMPO_BORRADO = 180  
 # 👆 ============================================================================ 👆
 
 INTERVALOS_TIMER = [10, 5, 4, 3, 2, 1]
