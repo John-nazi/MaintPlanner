@@ -42,7 +42,8 @@ SEMANAS_POR_PAGINA = 6
 # ⚙️ PARÁMETROS DE AUTODESTRUCCIÓN
 # ============================================================
 
-TIEMPO_BORRADO = 180  
+# Ajustado a 120 segundos (2 minutos)
+TIEMPO_BORRADO = 120  
 
 # Matriz para simular tiempo sin saturar la API de Telegram
 INTERVALOS_TIMER = [
@@ -229,7 +230,7 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token
     try:
         msg_timer = await context.bot.send_message(
             chat_id=chat_id,
-            text=f"⏳ *Limpieza programada...*",
+            text=f"⏳ *Calculando tiempo de purga...*",
             parse_mode="Markdown",
             reply_markup=obtener_teclado_maestro() 
         )
@@ -247,7 +248,8 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token
             ULTIMO_MENSAJE_POR_CHAT.get(chat_id, 0), timer_id
         )
 
-        tiempos = [t for t in INTERVALOS_TIMER if t < tiempo_total]
+        # SE AÑADE EL TIEMPO TOTAL AL INICIO PARA EVITAR EL CONGELAMIENTO INICIAL
+        tiempos = [tiempo_total] + [t for t in INTERVALOS_TIMER if t < tiempo_total]
         tiempo_anterior = tiempo_total
 
         for tiempo in tiempos:
