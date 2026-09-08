@@ -9,8 +9,8 @@ from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    ReplyKeyboardMarkup, # <--- IMPORTACIÓN NUEVA
-    KeyboardButton,      # <--- IMPORTACIÓN NUEVA
+    ReplyKeyboardMarkup,
+    KeyboardButton,
 )
 from telegram.ext import (
     ApplicationBuilder,
@@ -323,9 +323,13 @@ async def procesar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = mensaje.text or mensaje.caption or ""
     await reiniciar_temporizador(context, mensaje.chat_id, mensaje.message_id)
 
-    # === CAPTURAR BOTÓN DEL TECLADO INFERIOR ===
-    if texto == "📂 Desplegar Áreas de Trabajo":
+    # === CAPTURAR BOTONES DEL TECLADO INFERIOR ===
+    if texto == "📂 Áreas de Trabajo" or texto == "📂 Desplegar Áreas de Trabajo":
         await mostrar_areas(update, context)
+        return
+        
+    if texto == "🏠 Panel Principal":
+        await iniciar(update, context)
         return
 
     if not texto or texto.startswith("/"):
@@ -405,24 +409,33 @@ def crear_menu_semanas(clave_area, pagina=0):
 # COMANDOS Y CALLBACKS
 # ============================================================
 
+def obtener_teclado_maestro():
+    """Genera el teclado inferior persistente con dos botones"""
+    return ReplyKeyboardMarkup(
+        [
+            [KeyboardButton("🏠 Panel Principal"), KeyboardButton("📂 Áreas de Trabajo")]
+        ],
+        resize_keyboard=True,  
+        is_persistent=True     
+    )
+
 async def iniciar(update, context):
-    if not await comando_es_para_este_bot(update, context, "start"): return
-    mensaje = update.effective_message
+    # Ya sea que llegue por comando (/start) o por clic en el botón "Panel Principal"
+    if not update.callback_query:
+        mensaje = update.effective_message
+        es_comando = await comando_es_para_este_bot(update, context, "start")
+        es_texto_boton = (mensaje and mensaje.text == "🏠 Panel Principal")
+        if not (es_comando or es_texto_boton): return
+    else:
+        mensaje = update.effective_message
     
     programar_borrado(context, mensaje.chat_id, mensaje.message_id)
-
-    # === CREAR EL TECLADO INFERIOR (App UI) ===
-    teclado_inferior = ReplyKeyboardMarkup(
-        [[KeyboardButton("📂 Desplegar Áreas de Trabajo")]],
-        resize_keyboard=True,  # Hace los botones más pequeños y estéticos
-        is_persistent=True     # Mantiene el teclado siempre visible
-    )
 
     respuesta = await mensaje.reply_text(
         "🚀 *Sistema Integral de Gestión y Seguimiento de OTs MPS* 🚀\n\n"
         "Bienvenido. Aquí puedes consultar las Órdenes de Trabajo Semanales.\n\n"
-        "👉 Utiliza el botón en la parte inferior o envía /areas.",
-        reply_markup=teclado_inferior, # <--- ENVIAMOS EL TECLADO AQUÍ
+        "👉 Utiliza el menú inferior o envía /areas para explorar.",
+        reply_markup=obtener_teclado_maestro(), 
         parse_mode="Markdown",
     )
     programar_borrado(context, respuesta.chat_id, respuesta.message_id)
@@ -430,15 +443,15 @@ async def iniciar(update, context):
 
 
 async def mostrar_areas(update, context):
-    # Ya sea que llegue por comando (/areas) o por clic en el botón inferior
+    # Ya sea que llegue por comando (/areas) o por clic en el botón inferior "Áreas de Trabajo"
     if not update.callback_query:
-        # Verificamos si no es callback, entonces checamos comando o texto
         mensaje = update.effective_message
         es_comando = await comando_es_para_este_bot(update, context, "areas")
-        es_texto_boton = (mensaje and mensaje.text == "📂 Desplegar Áreas de Trabajo")
+        es_texto_boton = (mensaje and mensaje.text in ["📂 Áreas de Trabajo", "📂 Desplegar Áreas de Trabajo"])
         if not (es_comando or es_texto_boton): return
-    
-    mensaje = update.effective_message
+    else:
+        mensaje = update.effective_message
+        
     programar_borrado(context, mensaje.chat_id, mensaje.message_id)
 
     respuesta = await mensaje.reply_text(
