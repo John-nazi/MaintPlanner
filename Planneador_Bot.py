@@ -9,7 +9,6 @@ from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    WebAppInfo, # <--- IMPORTACIÓN AGREGADA AQUÍ
 )
 from telegram.ext import (
     ApplicationBuilder,
@@ -502,11 +501,12 @@ def crear_menu_semanas(clave_area, pagina=0):
     inicio = pagina * SEMANAS_POR_PAGINA
     fin = inicio + SEMANAS_POR_PAGINA
 
+    # === USAMOS URL NORMAL PARA GARANTIZAR QUE MICROSOFT RESPETE LA RUTA ===
     for numero in semanas[inicio:fin]:
         botones.append([
             InlineKeyboardButton(
                 text=f"📂 SEMANA {numero:02d}",
-                web_app=WebAppInfo(url=semanas_configuradas[numero]) # <--- MODIFICACIÓN AGREGADA AQUÍ
+                url=semanas_configuradas[numero] 
             )
         ])
 
@@ -643,7 +643,7 @@ def main():
     ruta = "telegram"
     url_webhook = f"{URL_RENDER}/{ruta}"
 
-    print("🚀 SISTEMA EN LÍNEA. Protocolo de purga establecido a 15 segundos.")
+    print(f"🚀 SISTEMA EN LÍNEA. Protocolo de purga establecido a {TIEMPO_BORRADO} segundos.")
     print(f"🔗 Enlace Webhook: {url_webhook}")
 
     aplicacion.run_webhook(
