@@ -9,6 +9,8 @@ from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    ReplyKeyboardMarkup, # <--- IMPORTACIÓN NUEVA
+    KeyboardButton,      # <--- IMPORTACIÓN NUEVA
 )
 from telegram.ext import (
     ApplicationBuilder,
@@ -40,9 +42,7 @@ SEMANAS_POR_PAGINA = 6
 # ⚙️ PARÁMETROS DE AUTODESTRUCCIÓN
 # ============================================================
 
-# 👇 MODIFICA ESTE VALOR PARA CAMBIAR EL TIEMPO DE AUTODESTRUCCIÓN (en segundos) 👇
 TIEMPO_BORRADO = 180  
-# 👆 ============================================================================ 👆
 
 INTERVALOS_TIMER = [10, 5, 4, 3, 2, 1]
 BARRIDO_CANTIDAD = 100
@@ -66,8 +66,6 @@ PALABRAS_PROHIBIDAS = [
 
 # ============================================================
 # ÁREAS Y LINKS SEMANALES
-# Pega tus enlaces de SharePoint/Drive entre las comillas "".
-# El bot SOLO mostrará las semanas que tengan un link válido (http/https).
 # ============================================================
 
 AREAS = {
@@ -75,116 +73,32 @@ AREAS = {
         "nombre": "Pintura y Secuenciado",
         "icono": "🔴",
         "semanas": {
-            52: "",
-            51: "",
-            50: "",
-            49: "",
-            48: "",
-            47: "",
-            46: "",
-            45: "",
-            44: "",
-            43: "",
-            42: "",
-            41: "",
+            52: "", 51: "", 50: "", 49: "", 48: "", 47: "", 46: "", 45: "", 44: "", 43: "", 42: "", 41: "",
             40: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgBIXpHXKby6Sp-tsiP_Z0vZATI_edTFZNfIVveA3T7Hd-M?e=XLVV8d",
             39: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgBsPEx7NZ1ZQYpvT_AgkUY3AeUrQ9kD5BQTgibCGlTOcqg?e=mAGZEb",
             38: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgCT8dS0HBNBQ7g8mUXtRNjXAbw3ZOkspb2j28-92JICJKo?e=dhLeJI",
             37: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgADatLyHOy-TqILvdDkrytVATBtUNoKDECFYAkFqjfhw1w?e=07uPVx",
             36: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgDKgPprvxzzTbWo8Rn0GTZYAfB5YAg6OXLfo6yj6HJnaAc?e=8IQOYb",
             35: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgB25IyE1cX0SKy5ETNt5mzrAV1sJlVnZ6djNQAD6AyqAtQ?e=JDr5Sm",
-            34: "",
-            33: "",
-            32: "",
-            31: "",
-            30: "",
-            29: "",
-            28: "",
-            27: "",
-            26: "",
-            25: "",
-            24: "",
-            23: "",
-            22: "",
-            21: "",
-            20: "",
-            19: "",
-            18: "",
-            17: "",
-            16: "",
-            15: "",
-            14: "",
-            13: "",
-            12: "",
-            11: "",
-            10: "",
-            9: "",
-            8: "",
-            7: "",
-            6: "",
-            5: "",
-            4: "",
-            3: "",
-            2: "",
-            1: "",
+            34: "", 33: "", 32: "", 31: "", 30: "", 29: "", 28: "", 27: "", 26: "", 25: "", 24: "", 23: "",
+            22: "", 21: "", 20: "", 19: "", 18: "", 17: "", 16: "", 15: "", 14: "", 13: "", 12: "", 11: "",
+            10: "", 9: "", 8: "", 7: "", 6: "", 5: "", 4: "", 3: "", 2: "", 1: "",
         },
     },
     "eco_custom": {
         "nombre": "Eco-Custom",
         "icono": "🟢",
         "semanas": {
-            52: "",
-            51: "",
-            50: "",
-            49: "",
-            48: "",
-            47: "",
-            46: "",
-            45: "",
-            44: "",
-            43: "",
-            42: "",
-            41: "",
+            52: "", 51: "", 50: "", 49: "", 48: "", 47: "", 46: "", 45: "", 44: "", 43: "", 42: "", 41: "",
             40: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgCiEfxuD_G0T5rLeDTegs0wAUJMAUQylvVICQZGZes63lQ?e=w6ZEQZ",
             39: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgDHJdsV8iQpQ4se4m5gQmYhAXUJZAlhKVVxR3oDr1rfJ0o?e=aMsJcC",
             38: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgBIHDAFDvduT5nSPkTwZ_a2AR8nrZtxngjw-kO0_tFdCcE?e=R8pNtI",
             37: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgD8WD3_qSoURJ-x1DlgaF3RAZmVP4yyj4ki7ujgymtAVZA?e=9GrCG5",
             36: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgAEcifIWjX5QJDEBOqYy9LRAff8cHRVllbqMxuiXJCcZKA?e=mO54GL",
             35: "https://grupometalsa.sharepoint.com/:f:/s/MMSMantenimientoEquiposVC/IgAE7H0CprJjQLbrNTJ3FRagAbNNourBQiUJGbRGE57FKEQ?e=MSt8j6",
-            34: "",
-            33: "",
-            32: "",
-            31: "",
-            30: "",
-            29: "",
-            28: "",
-            27: "",
-            26: "",
-            25: "",
-            24: "",
-            23: "",
-            22: "",
-            21: "",
-            20: "",
-            19: "",
-            18: "",
-            17: "",
-            16: "",
-            15: "",
-            14: "",
-            13: "",
-            12: "",
-            11: "",
-            10: "",
-            9: "",
-            8: "",
-            7: "",
-            6: "",
-            5: "",
-            4: "",
-            3: "",
-            2: "",
-            1: "",
+            34: "", 33: "", 32: "", 31: "", 30: "", 29: "", 28: "", 27: "", 26: "", 25: "", 24: "", 23: "",
+            22: "", 21: "", 20: "", 19: "", 18: "", 17: "", 16: "", 15: "", 14: "", 13: "", 12: "", 11: "",
+            10: "", 9: "", 8: "", 7: "", 6: "", 5: "", 4: "", 3: "", 2: "", 1: "",
         },
     },
 }
@@ -198,24 +112,18 @@ async def comando_es_para_este_bot(update, context, comando):
     mensaje = update.effective_message
     if mensaje is None or not mensaje.text:
         return False
-
     primera_parte = mensaje.text.split()[0].lower()
     comando_base = f"/{comando.lower()}"
-
     if primera_parte == comando_base:
         return True
-
     if primera_parte.startswith(comando_base + "@"):
         destinatario = primera_parte.split("@", 1)[1]
         try:
             datos_bot = await context.bot.get_me()
             nuestro_usuario = (datos_bot.username or "").lower()
-        except Exception as error:
-            logger.warning("No se pudo obtener el username del bot: %s", error)
+        except Exception:
             return False
-
         return destinatario == nuestro_usuario
-
     return False
 
 
@@ -227,15 +135,12 @@ def obtener_mensajes_protegidos(chat_id):
     return MENSAJES_PROTEGIDOS.setdefault(chat_id, set())
 
 def proteger_mensaje(chat_id, message_id):
-    if message_id is None:
-        return
+    if message_id is None: return
     obtener_mensajes_protegidos(chat_id).add(message_id)
-
 
 async def borrar_mensaje_despues(context, chat_id, message_id, segundos):
     await asyncio.sleep(segundos)
-    if message_id in obtener_mensajes_protegidos(chat_id):
-        return
+    if message_id in obtener_mensajes_protegidos(chat_id): return
     try:
         await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
     except Exception:
@@ -247,8 +152,7 @@ def programar_borrado(context, chat_id, message_id, segundos=TIEMPO_BORRADO):
     )
 
 async def borrar_un_mensaje_barrido(context, chat_id, message_id):
-    if message_id in obtener_mensajes_protegidos(chat_id):
-        return False
+    if message_id in obtener_mensajes_protegidos(chat_id): return False
     try:
         await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
         return True
@@ -256,24 +160,13 @@ async def borrar_un_mensaje_barrido(context, chat_id, message_id):
         return False
 
 async def barrido_profundo(context, chat_id, message_id_tope):
-    if message_id_tope is None:
-        return
-
+    if message_id_tope is None: return
     protegidos = obtener_mensajes_protegidos(chat_id)
     inicio = max(1, message_id_tope - BARRIDO_CANTIDAD + 1)
-    
-    ids = [
-        message_id
-        for message_id in range(message_id_tope, inicio - 1, -1)
-        if message_id not in protegidos
-    ]
-
-    if not ids:
-        return
-
+    ids = [mid for mid in range(message_id_tope, inicio - 1, -1) if mid not in protegidos]
+    if not ids: return
     eliminados = 0
     lote = 10
-
     for posicion in range(0, len(ids), lote):
         grupo = ids[posicion:posicion + lote]
         resultados = await asyncio.gather(
@@ -283,13 +176,11 @@ async def barrido_profundo(context, chat_id, message_id_tope):
         eliminados += sum(1 for resultado in resultados if resultado is True)
         await asyncio.sleep(0.15)
 
-
 async def reiniciar_temporizador(context, chat_id, current_msg_id):
     if current_msg_id is not None:
         ULTIMO_MENSAJE_POR_CHAT[chat_id] = max(
             ULTIMO_MENSAJE_POR_CHAT.get(chat_id, 0), current_msg_id
         )
-
     anterior = LIMPIEZAS_ACTIVAS.get(chat_id)
     if anterior is not None:
         if anterior.get("task"):
@@ -331,8 +222,7 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token
         if info is None or info.get("token") is not token_limpieza:
             try:
                 await context.bot.delete_message(chat_id=chat_id, message_id=timer_id)
-            except Exception:
-                pass
+            except Exception: pass
             return
 
         info["timer_msg_id"] = timer_id
@@ -352,7 +242,6 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token
             if info_actual is None or info_actual.get("token") is not token_limpieza:
                 return
 
-            # Barra de progreso "Pro" 
             progreso_porcentaje = int(((tiempo_total - tiempo) / tiempo_total) * 100)
             bloques_llenos = int(progreso_porcentaje / 10)
             barra = "█" * bloques_llenos + "░" * (10 - bloques_llenos)
@@ -373,7 +262,6 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token
                 )
             except Exception:
                 pass
-
             tiempo_anterior = tiempo
 
         if tiempo_anterior > 0:
@@ -406,9 +294,7 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token
 def normalizar_texto(texto):
     texto = texto.lower()
     texto = unicodedata.normalize("NFD", texto)
-    return "".join(
-        caracter for caracter in texto if unicodedata.category(caracter) != "Mn"
-    )
+    return "".join(caracter for caracter in texto if unicodedata.category(caracter) != "Mn")
 
 def contiene_palabra_prohibida(texto):
     texto = normalizar_texto(texto)
@@ -437,15 +323,17 @@ async def procesar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = mensaje.text or mensaje.caption or ""
     await reiniciar_temporizador(context, mensaje.chat_id, mensaje.message_id)
 
-    # Lógica de Moderación
+    # === CAPTURAR BOTÓN DEL TECLADO INFERIOR ===
+    if texto == "📂 Desplegar Áreas de Trabajo":
+        await mostrar_areas(update, context)
+        return
+
     if not texto or texto.startswith("/"):
         return
 
     if contiene_palabra_prohibida(texto):
         try:
-            await context.bot.delete_message(
-                chat_id=mensaje.chat_id, message_id=mensaje.message_id
-            )
+            await context.bot.delete_message(chat_id=mensaje.chat_id, message_id=mensaje.message_id)
             aviso = await context.bot.send_message(
                 chat_id=mensaje.chat_id,
                 message_thread_id=mensaje.message_thread_id,
@@ -467,21 +355,16 @@ async def procesar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def obtener_semanas_configuradas(clave_area):
     area = AREAS.get(clave_area)
     if not area: return {}
-
     resultado = {}
     for numero, enlace in area["semanas"].items():
         enlace = enlace.strip()
-        # Validación: Solo extrae enlaces que sean URLs válidas
         if enlace.startswith(("http://", "https://")):
             resultado[numero] = enlace
     return resultado
 
 def crear_menu_areas():
     botones = [
-        [InlineKeyboardButton(
-            text=f"{area['icono']} {area['nombre']}",
-            callback_data=f"area:{clave}"
-        )]
+        [InlineKeyboardButton(text=f"{area['icono']} {area['nombre']}", callback_data=f"area:{clave}")]
         for clave, area in AREAS.items()
     ]
     return InlineKeyboardMarkup(botones)
@@ -501,21 +384,15 @@ def crear_menu_semanas(clave_area, pagina=0):
     inicio = pagina * SEMANAS_POR_PAGINA
     fin = inicio + SEMANAS_POR_PAGINA
 
-    # === USAMOS URL NORMAL PARA GARANTIZAR QUE MICROSOFT RESPETE LA RUTA ===
     for numero in semanas[inicio:fin]:
         botones.append([
-            InlineKeyboardButton(
-                text=f"📂 SEMANA {numero:02d}",
-                url=semanas_configuradas[numero] 
-            )
+            InlineKeyboardButton(text=f"📂 SEMANA {numero:02d}", url=semanas_configuradas[numero])
         ])
 
     navegacion = []
     if pagina > 0:
         navegacion.append(InlineKeyboardButton("◀️ Atrás", callback_data=f"semanas:{clave_area}:{pagina - 1}"))
-    
     navegacion.append(InlineKeyboardButton(f"Pág. {pagina + 1}/{total_paginas}", callback_data="pagina_actual"))
-    
     if pagina < (total_paginas - 1):
         navegacion.append(InlineKeyboardButton("Sig. ▶️", callback_data=f"semanas:{clave_area}:{pagina + 1}"))
 
@@ -534,10 +411,18 @@ async def iniciar(update, context):
     
     programar_borrado(context, mensaje.chat_id, mensaje.message_id)
 
+    # === CREAR EL TECLADO INFERIOR (App UI) ===
+    teclado_inferior = ReplyKeyboardMarkup(
+        [[KeyboardButton("📂 Desplegar Áreas de Trabajo")]],
+        resize_keyboard=True,  # Hace los botones más pequeños y estéticos
+        is_persistent=True     # Mantiene el teclado siempre visible
+    )
+
     respuesta = await mensaje.reply_text(
         "🚀 *Sistema Integral de Gestión y Seguimiento de OTs MPS* 🚀\n\n"
         "Bienvenido. Aquí puedes consultar las Órdenes de Trabajo Semanales.\n\n"
-        "👉 Envía /areas para desplegar el directorio maestro.",
+        "👉 Utiliza el botón en la parte inferior o envía /areas.",
+        reply_markup=teclado_inferior, # <--- ENVIAMOS EL TECLADO AQUÍ
         parse_mode="Markdown",
     )
     programar_borrado(context, respuesta.chat_id, respuesta.message_id)
@@ -545,9 +430,15 @@ async def iniciar(update, context):
 
 
 async def mostrar_areas(update, context):
-    if not await comando_es_para_este_bot(update, context, "areas"): return
+    # Ya sea que llegue por comando (/areas) o por clic en el botón inferior
+    if not update.callback_query:
+        # Verificamos si no es callback, entonces checamos comando o texto
+        mensaje = update.effective_message
+        es_comando = await comando_es_para_este_bot(update, context, "areas")
+        es_texto_boton = (mensaje and mensaje.text == "📂 Desplegar Áreas de Trabajo")
+        if not (es_comando or es_texto_boton): return
+    
     mensaje = update.effective_message
-
     programar_borrado(context, mensaje.chat_id, mensaje.message_id)
 
     respuesta = await mensaje.reply_text(
