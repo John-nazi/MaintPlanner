@@ -431,10 +431,11 @@ async def iniciar(update, context):
     
     programar_borrado(context, mensaje.chat_id, mensaje.message_id)
 
+    # AQUÍ QUITAMOS LA MENCIÓN DE "/areas"
     respuesta = await mensaje.reply_text(
         "🚀 *Sistema Integral de Gestión y Seguimiento de OTs MPS* 🚀\n\n"
         "Bienvenido. Aquí puedes consultar las Órdenes de Trabajo Semanales.\n\n"
-        "👉 Utiliza el menú inferior o envía /areas para explorar.",
+        "👉 Utiliza el menú inferior para explorar el directorio.",
         reply_markup=obtener_teclado_maestro(), 
         parse_mode="Markdown",
     )
