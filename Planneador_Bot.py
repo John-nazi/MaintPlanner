@@ -44,7 +44,10 @@ SEMANAS_POR_PAGINA = 6
 
 TIEMPO_BORRADO = 180  
 
-INTERVALOS_TIMER = [10, 5, 4, 3, 2, 1]
+# Matriz ampliada para dar efecto de "tiempo real" actualizando cada 10s
+INTERVALOS_TIMER = [
+    170, 160, 150, 140, 130, 120, 110, 100, 90, 80, 70, 60, 50, 40, 30, 20, 15, 10, 5, 4, 3, 2, 1
+]
 BARRIDO_CANTIDAD = 100
 TIEMPO_BORRADO_AVISO = 5
 
@@ -211,9 +214,10 @@ async def reiniciar_temporizador(context, chat_id, current_msg_id):
 async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token_limpieza):
     timer_id = None
     try:
+        # Texto inicial mucho más limpio y preciso
         msg_timer = await context.bot.send_message(
             chat_id=chat_id,
-            text="📡 _Inicializando protocolo de purga..._",
+            text=f"⏳ *Limpieza programada en {tiempo_total} segundos...*",
             parse_mode="Markdown",
         )
         timer_id = msg_timer.message_id
@@ -242,15 +246,18 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token
             if info_actual is None or info_actual.get("token") is not token_limpieza:
                 return
 
+            # Barra de progreso minimalista (▰▰▰▱▱)
             progreso_porcentaje = int(((tiempo_total - tiempo) / tiempo_total) * 100)
             bloques_llenos = int(progreso_porcentaje / 10)
-            barra = "█" * bloques_llenos + "░" * (10 - bloques_llenos)
+            barra = "▰" * bloques_llenos + "▱" * (10 - bloques_llenos)
 
             texto_timer = (
-                "🚨 *PROTOCOLO DE PURGA ACTIVADO* 🚨\n\n"
-                f"`[{barra}] {progreso_porcentaje}%`\n\n"
-                f"⏳ Destrucción de historial en: *{tiempo}s*\n"
-                "_Protegiendo la confidencialidad de la operación._"
+                "🧹 *SISTEMA DE PURGA ACTIVO*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                f"⏱️ Restante: *{tiempo} segundos*\n"
+                f"📊 Progreso: `{barra} {progreso_porcentaje}%`\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "_Protegiendo confidencialidad operativa._"
             )
 
             try:
@@ -380,7 +387,7 @@ def crear_menu_semanas(clave_area, pagina=0):
 
     if not semanas:
         botones.append([InlineKeyboardButton("⚠️ Directorio Vacío", callback_data="sin_semanas")])
-        botones.append([InlineKeyboardButton("⬅️ Panel Principal", callback_data="volver_areas")])
+        # Se eliminó el botón de regreso aquí
         return InlineKeyboardMarkup(botones)
 
     total_paginas = ceil(len(semanas) / SEMANAS_POR_PAGINA)
@@ -401,7 +408,7 @@ def crear_menu_semanas(clave_area, pagina=0):
         navegacion.append(InlineKeyboardButton("Sig. ▶️", callback_data=f"semanas:{clave_area}:{pagina + 1}"))
 
     botones.append(navegacion)
-    botones.append([InlineKeyboardButton("⬅️ Panel Principal", callback_data="volver_areas")])
+    # Se eliminó el botón transparente de Panel Principal para mantener la interfaz limpia
     return InlineKeyboardMarkup(botones)
 
 
@@ -420,7 +427,6 @@ def obtener_teclado_maestro():
     )
 
 async def iniciar(update, context):
-    # Ya sea que llegue por comando (/start) o por clic en el botón "Panel Principal"
     if not update.callback_query:
         mensaje = update.effective_message
         es_comando = await comando_es_para_este_bot(update, context, "start")
@@ -431,7 +437,6 @@ async def iniciar(update, context):
     
     programar_borrado(context, mensaje.chat_id, mensaje.message_id)
 
-    # AQUÍ QUITAMOS LA MENCIÓN DE "/areas"
     respuesta = await mensaje.reply_text(
         "🚀 *Sistema Integral de Gestión y Seguimiento de OTs MPS* 🚀\n\n"
         "Bienvenido. Aquí puedes consultar las Órdenes de Trabajo Semanales.\n\n"
@@ -444,7 +449,6 @@ async def iniciar(update, context):
 
 
 async def mostrar_areas(update, context):
-    # Ya sea que llegue por comando (/areas) o por clic en el botón inferior "Áreas de Trabajo"
     if not update.callback_query:
         mensaje = update.effective_message
         es_comando = await comando_es_para_este_bot(update, context, "areas")
@@ -511,17 +515,6 @@ async def cambiar_pagina(update, context):
     await consulta.edit_message_reply_markup(reply_markup=crear_menu_semanas(clave, pagina))
 
 
-async def volver_areas(update, context):
-    consulta = update.callback_query
-    if not consulta: return
-    await consulta.answer()
-
-    await consulta.edit_message_text(
-        text="🗄️ *DIRECTORIO MAESTRO DE O.T.*\n\nSelecciona un departamento operativo:",
-        reply_markup=crear_menu_areas(),
-        parse_mode="Markdown",
-    )
-
 async def manejar_error(update, context):
     logger.error("Excepción en el sistema:", exc_info=context.error)
 
@@ -540,7 +533,6 @@ def main():
     
     aplicacion.add_handler(CallbackQueryHandler(seleccionar_area, pattern=r"^area:"))
     aplicacion.add_handler(CallbackQueryHandler(cambiar_pagina, pattern=r"^(semanas:|pagina_actual|sin_semanas)"))
-    aplicacion.add_handler(CallbackQueryHandler(volver_areas, pattern=r"^volver_areas$"))
     
     aplicacion.add_handler(MessageHandler(filters.ALL, procesar_mensaje))
     aplicacion.add_error_handler(manejar_error)
