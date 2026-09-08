@@ -9,6 +9,7 @@ from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    WebAppInfo, # <--- IMPORTACIÓN AGREGADA AQUÍ
 )
 from telegram.ext import (
     ApplicationBuilder,
@@ -505,7 +506,7 @@ def crear_menu_semanas(clave_area, pagina=0):
         botones.append([
             InlineKeyboardButton(
                 text=f"📂 SEMANA {numero:02d}",
-                url=semanas_configuradas[numero]
+                web_app=WebAppInfo(url=semanas_configuradas[numero]) # <--- MODIFICACIÓN AGREGADA AQUÍ
             )
         ])
 
