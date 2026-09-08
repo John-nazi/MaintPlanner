@@ -44,7 +44,7 @@ SEMANAS_POR_PAGINA = 6
 
 TIEMPO_BORRADO = 180  
 
-# Matriz ampliada para dar efecto de "tiempo real" actualizando cada 10s
+# Matriz para simular tiempo sin saturar la API de Telegram
 INTERVALOS_TIMER = [
     170, 160, 150, 140, 130, 120, 110, 100, 90, 80, 70, 60, 50, 40, 30, 20, 15, 10, 5, 4, 3, 2, 1
 ]
@@ -106,6 +106,19 @@ AREAS = {
     },
 }
 
+# ============================================================
+# TECLADO MAESTRO INFERIOR
+# ============================================================
+
+def obtener_teclado_maestro():
+    """Genera el teclado inferior persistente con dos botones"""
+    return ReplyKeyboardMarkup(
+        [
+            [KeyboardButton("🏠 Panel Principal"), KeyboardButton("📂 Áreas de Trabajo")]
+        ],
+        resize_keyboard=True,  
+        is_persistent=True     
+    )
 
 # ============================================================
 # VALIDAR QUE EL COMANDO SEA PARA NUESTRO BOT
@@ -214,11 +227,11 @@ async def reiniciar_temporizador(context, chat_id, current_msg_id):
 async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token_limpieza):
     timer_id = None
     try:
-        # Texto inicial mucho más limpio y preciso
         msg_timer = await context.bot.send_message(
             chat_id=chat_id,
-            text=f"⏳ *Limpieza programada en {tiempo_total} segundos...*",
+            text=f"⏳ *Limpieza programada...*",
             parse_mode="Markdown",
+            reply_markup=obtener_teclado_maestro() 
         )
         timer_id = msg_timer.message_id
         
@@ -246,7 +259,11 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token
             if info_actual is None or info_actual.get("token") is not token_limpieza:
                 return
 
-            # Barra de progreso minimalista (▰▰▰▱▱)
+            # --- LÓGICA DE RELOJ DIGITAL MM:SS ---
+            minutos = tiempo // 60
+            segundos = tiempo % 60
+            reloj_digital = f"{minutos:02d}:{segundos:02d}"
+
             progreso_porcentaje = int(((tiempo_total - tiempo) / tiempo_total) * 100)
             bloques_llenos = int(progreso_porcentaje / 10)
             barra = "▰" * bloques_llenos + "▱" * (10 - bloques_llenos)
@@ -254,7 +271,7 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token
             texto_timer = (
                 "🧹 *SISTEMA DE PURGA ACTIVO*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                f"⏱️ Restante: *{tiempo} segundos*\n"
+                f"⏱️ `[ {reloj_digital} ]`\n\n"
                 f"📊 Progreso: `{barra} {progreso_porcentaje}%`\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "_Protegiendo confidencialidad operativa._"
@@ -330,7 +347,6 @@ async def procesar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = mensaje.text or mensaje.caption or ""
     await reiniciar_temporizador(context, mensaje.chat_id, mensaje.message_id)
 
-    # === CAPTURAR BOTONES DEL TECLADO INFERIOR ===
     if texto == "📂 Áreas de Trabajo" or texto == "📂 Desplegar Áreas de Trabajo":
         await mostrar_areas(update, context)
         return
@@ -387,7 +403,6 @@ def crear_menu_semanas(clave_area, pagina=0):
 
     if not semanas:
         botones.append([InlineKeyboardButton("⚠️ Directorio Vacío", callback_data="sin_semanas")])
-        # Se eliminó el botón de regreso aquí
         return InlineKeyboardMarkup(botones)
 
     total_paginas = ceil(len(semanas) / SEMANAS_POR_PAGINA)
@@ -408,23 +423,12 @@ def crear_menu_semanas(clave_area, pagina=0):
         navegacion.append(InlineKeyboardButton("Sig. ▶️", callback_data=f"semanas:{clave_area}:{pagina + 1}"))
 
     botones.append(navegacion)
-    # Se eliminó el botón transparente de Panel Principal para mantener la interfaz limpia
     return InlineKeyboardMarkup(botones)
 
 
 # ============================================================
 # COMANDOS Y CALLBACKS
 # ============================================================
-
-def obtener_teclado_maestro():
-    """Genera el teclado inferior persistente con dos botones"""
-    return ReplyKeyboardMarkup(
-        [
-            [KeyboardButton("🏠 Panel Principal"), KeyboardButton("📂 Áreas de Trabajo")]
-        ],
-        resize_keyboard=True,  
-        is_persistent=True     
-    )
 
 async def iniciar(update, context):
     if not update.callback_query:
