@@ -45,7 +45,7 @@ SEMANAS_POR_PAGINA = 6
 # Ajustado a 120 segundos (2 minutos)
 TIEMPO_BORRADO = 120  
 
-# Matriz para simular tiempo sin saturar la API de Telegram
+# Matriz para simular tiempo en tiempo real
 INTERVALOS_TIMER = [
     170, 160, 150, 140, 130, 120, 110, 100, 90, 80, 70, 60, 50, 40, 30, 20, 15, 10, 5, 4, 3, 2, 1
 ]
@@ -228,10 +228,11 @@ async def reiniciar_temporizador(context, chat_id, current_msg_id):
 async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token_limpieza):
     timer_id = None
     try:
+        # SE USA HTML PARA EVITAR ERRORES DE PARSEO
         msg_timer = await context.bot.send_message(
             chat_id=chat_id,
-            text=f"⏳ *Calculando tiempo de purga...*",
-            parse_mode="Markdown",
+            text="⏳ <b>Calculando tiempo de purga...</b>",
+            parse_mode="HTML",
             reply_markup=obtener_teclado_maestro() 
         )
         timer_id = msg_timer.message_id
@@ -248,7 +249,7 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token
             ULTIMO_MENSAJE_POR_CHAT.get(chat_id, 0), timer_id
         )
 
-        # SE AÑADE EL TIEMPO TOTAL AL INICIO PARA EVITAR EL CONGELAMIENTO INICIAL
+        # SE AÑADE EL TIEMPO TOTAL AL INICIO DE LA LISTA
         tiempos = [tiempo_total] + [t for t in INTERVALOS_TIMER if t < tiempo_total]
         tiempo_anterior = tiempo_total
 
@@ -270,13 +271,14 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token
             bloques_llenos = int(progreso_porcentaje / 10)
             barra = "▰" * bloques_llenos + "▱" * (10 - bloques_llenos)
 
+            # ESTRUCTURA HTML SEGURA
             texto_timer = (
-                "🧹 *SISTEMA DE PURGA ACTIVO*\n"
+                "🧹 <b>SISTEMA DE PURGA ACTIVO</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                f"⏱️ `[ {reloj_digital} ]`\n\n"
-                f"📊 Progreso: `{barra} {progreso_porcentaje}%`\n"
+                f"⏱️ <code>[ {reloj_digital} ]</code>\n\n"
+                f"📊 Progreso: <code>{barra} {progreso_porcentaje}%</code>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                "_Protegiendo confidencialidad operativa._"
+                "<i>Protegiendo confidencialidad operativa.</i>"
             )
 
             try:
@@ -284,10 +286,11 @@ async def rutina_limpieza_chat(context, chat_id, max_msg_id, tiempo_total, token
                     chat_id=chat_id,
                     message_id=timer_id,
                     text=texto_timer,
-                    parse_mode="Markdown",
+                    parse_mode="HTML",
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Error editando timer: {e}")
+                
             tiempo_anterior = tiempo
 
         if tiempo_anterior > 0:
@@ -366,8 +369,8 @@ async def procesar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
             aviso = await context.bot.send_message(
                 chat_id=mensaje.chat_id,
                 message_thread_id=mensaje.message_thread_id,
-                text="🛑 *INFRACCIÓN DETECTADA*\nEl mensaje fue bloqueado por contener lenguaje no permitido.",
-                parse_mode="Markdown"
+                text="🛑 <b>INFRACCIÓN DETECTADA</b>\nEl mensaje fue bloqueado por contener lenguaje no permitido.",
+                parse_mode="HTML"
             )
             ULTIMO_MENSAJE_POR_CHAT[mensaje.chat_id] = max(
                 ULTIMO_MENSAJE_POR_CHAT.get(mensaje.chat_id, 0), aviso.message_id
@@ -444,11 +447,11 @@ async def iniciar(update, context):
     programar_borrado(context, mensaje.chat_id, mensaje.message_id)
 
     respuesta = await mensaje.reply_text(
-        "🚀 *Sistema Integral de Gestión y Seguimiento de OTs MPS* 🚀\n\n"
+        "🚀 <b>Sistema Integral de Gestión y Seguimiento de OTs MPS</b> 🚀\n\n"
         "Bienvenido. Aquí puedes consultar las Órdenes de Trabajo Semanales.\n\n"
         "👉 Utiliza el menú inferior para explorar el directorio.",
         reply_markup=obtener_teclado_maestro(), 
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     programar_borrado(context, respuesta.chat_id, respuesta.message_id)
     await reiniciar_temporizador(context, respuesta.chat_id, respuesta.message_id)
@@ -466,10 +469,10 @@ async def mostrar_areas(update, context):
     programar_borrado(context, mensaje.chat_id, mensaje.message_id)
 
     respuesta = await mensaje.reply_text(
-        "🗄️ *DIRECTORIO MAESTRO DE O.T.*\n\n"
+        "🗄️ <b>DIRECTORIO MAESTRO DE O.T.</b>\n\n"
         "Selecciona un departamento operativo:",
         reply_markup=crear_menu_areas(),
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     programar_borrado(context, respuesta.chat_id, respuesta.message_id)
     await reiniciar_temporizador(context, respuesta.chat_id, respuesta.message_id)
@@ -489,11 +492,11 @@ async def seleccionar_area(update, context):
 
     await consulta.edit_message_text(
         text=(
-            f"🗂️ *DEPARTAMENTO:* `{area['nombre']}`\n\n"
+            f"🗂️ <b>DEPARTAMENTO:</b> <code>{area['nombre']}</code>\n\n"
             "Selecciona la base de datos semanal correspondiente:"
         ),
         reply_markup=crear_menu_semanas(clave, 0),
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
 
 
